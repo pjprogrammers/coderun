@@ -1,11 +1,36 @@
-coderun/
-├── README.md
-├── LICENSE
-├── install.sh          # Linux
-├── install-mac.sh      # macOS
-├── install.ps1         # Windows PowerShell
-├── bin/
-│   ├── coderun         # Linux
-│   └── coderun-mac     # macOS
-└── windows/
-    └── coderun.ps1
+# coderun
+
+A tiny cross-platform command-line runner for C, C++ and Python.
+
+Run:
+
+coderun main.cpp
+coderun main.c
+coderun main.py
+
+No configuration required.
+
+
+# coderun
+
+A tiny cross-platform command-line runner for C, C++ and Python. V1
+
+Run:
+
+coderun main.cpp
+coderun main.c
+coderun main.py
+
+No configuration required.
+
+#installation 
+git clone https://github.com/pjprogrammers/coderun.git
+cd coderun
+For Linux Based Distros:
+./install.sh
+
+For macOS:
+./install-mac.sh
+
+For Windows:
+.\install.ps1

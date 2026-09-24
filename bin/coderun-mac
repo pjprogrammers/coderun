@@ -1,1 +1,35 @@
+#!/usr/bin/env bash
 
+if [ $# -eq 0 ]; then
+    echo "Usage: coderun <file>"
+    exit 1
+fi
+
+file="$1"
+
+if [ ! -f "$file" ]; then
+    echo "Error: file not found: $file"
+    exit 1
+fi
+
+dir="$(dirname "$file")"
+name="$(basename "$file")"
+base="${name%.*}"
+ext="${name##*.}"
+
+case "$ext" in
+    cpp)
+        clang++ "$file" -o "$dir/$base" && "$dir/$base"
+        ;;
+    c)
+        clang "$file" -o "$dir/$base" && "$dir/$base"
+        ;;
+    py)
+        python3 "$file"
+        ;;
+    *)
+        echo "Unsupported file type: .$ext"
+        echo "Supported: .py .cpp .c"
+        exit 1
+        ;;
+esac
