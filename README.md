@@ -34,7 +34,7 @@ coderun main.py
 coderun/
 │
 ├── bin/
-│   ├── coderun-linux
+│   ├── coderun
 │   └── coderun-mac
 │
 ├── windows/
@@ -52,7 +52,7 @@ coderun/
 
 | File                  | Purpose                            |
 | --------------------- | ---------------------------------- |
-| `bin/coderun-linux`   | Runner used on Linux-based systems |
+| `bin/coderun`         | Runner used on Linux-based systems |
 | `bin/coderun-mac`     | Runner used on macOS               |
 | `windows/coderun.ps1` | Runner used on Windows             |
 | `install.sh`          | Automated Linux installation       |
@@ -100,7 +100,9 @@ The installer:
 * Makes the command executable
 * Configures the environment automatically
 
-After installation:
+**Important:** The PATH change does not affect the terminal currently running the installer. After the installation finishes, **close the current terminal and open a new terminal** before using `coderun`.
+
+Then run:
 
 ```bash
 coderun main.cpp
@@ -122,7 +124,9 @@ The installer:
 * Makes the command executable
 * Configures the environment automatically
 
-After installation:
+**Important:** The PATH change does not affect the terminal currently running the installer. After the installation finishes, **close the current terminal and open a new terminal** before using `coderun`.
+
+Then run:
 
 ```bash
 coderun main.cpp
@@ -144,7 +148,9 @@ The installer:
 * Adds the installation directory to the User PATH
 * Requires no manual Environment Variable configuration
 
-After installation, open a new terminal and run:
+**Important:** The PATH change does not affect the terminal currently running the installer. After the installation finishes, **close the current PowerShell or Command Prompt window and open a new terminal** before using `coderun`.
+
+Then run:
 
 ```powershell
 coderun main.cpp
@@ -390,5 +396,5 @@ Current supported file types:
 
 ## License
 
-See the [LICENSE](LICENSE) file for license information.
+See the [LICENSE](https://github.com/pjprogrammers/coderun/blob/main/LICENSE) file for license information.
 
