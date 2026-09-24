@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ $# -eq 0 ]; then
+    echo "Usage: coderun <file>"
+    exit 1
+fi
+
+file="$1"
+dir="$(dirname "$file")"
+name="$(basename "$file")"
+base="${name%.*}"
+ext="${name##*.}"
+
+case "$ext" in
+    cpp)
+        g++ "$file" -o "$dir/$base" && "$dir/$base"
+        ;;
+    c)
+        gcc "$file" -o "$dir/$base" && "$dir/$base"
+        ;;
+    py)
+        python3 "$file"
+        ;;
+    *)
+        echo "Unsupported file type: .$ext"
+	echo "only file types .py .cpp .c are supported."
+        exit 1
+        ;;
+esac
