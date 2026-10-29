@@ -1,3 +1,4 @@
+```bash
 #!/usr/bin/env bash
 
 if [ $# -eq 0 ]; then
@@ -27,9 +28,43 @@ case "$ext" in
     py)
         python3 "$file"
         ;;
+    R|r)
+        Rscript "$file"
+        ;;
+    java)
+        java "$file"
+        ;;
+    rs)
+        rustc "$file" -o "$dir/$base" && "$dir/$base"
+        ;;
+    js)
+        node "$file"
+        ;;
+    ts)
+        tsx "$file"
+        ;;
+    go)
+        go run "$file"
+        ;;
+    php)
+        php "$file"
+        ;;
+    rb)
+        ruby "$file"
+        ;;
+    sh)
+        bash "$file"
+        ;;
+    swift)
+        swift "$file"
+        ;;
+    kt)
+        kotlinc "$file" -include-runtime -d "$dir/$base.jar" && java -jar "$dir/$base.jar"
+        ;;
     *)
         echo "Unsupported file type: .$ext"
-        echo "Supported: .py .cpp .c"
+        echo "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt"
         exit 1
         ;;
 esac
+```
