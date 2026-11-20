@@ -1,40 +1,104 @@
 #!/usr/bin/env bash
 
 # Keep in sync with the VERSION file.
-CODERUN_VERSION="2.3.1"
+CODERUN_VERSION="2.4.0"
 
-UPDATE_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/bin/coderun-mac"
-VERSION_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/VERSION"
+# Override for testing or mirrors. The runner appends /main or /v<version>.
+CODERUN_RAW_BASE="${CODERUN_RAW_BASE:-https://raw.githubusercontent.com/pjprogrammers/coderun}"
+
 INSTALL_DIR="$HOME/.local/bin"
 
-# Platform-specific settings.
-CONFIG_FILES=("$HOME/.zshrc" "$HOME/.zprofile")
-SED_INPLACE=(-i '')
-C_COMPILER="clang"
-CPP_COMPILER="clang++"
+# Platform-specific settings. The Linux and macOS runners share this file.
+case "$(uname -s 2>/dev/null)" in
+    Darwin)
+        C_COMPILER="clang"
+        CPP_COMPILER="clang++"
+        RUNNER_PATH="bin/coderun-mac"
+        INSTALLER_HINT="./install-mac.sh"
+        CONFIG_FILES=("$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.bashrc")
+        ;;
+    *)
+        C_COMPILER="gcc"
+        CPP_COMPILER="g++"
+        RUNNER_PATH="bin/coderun"
+        INSTALLER_HINT="./install.sh"
+        CONFIG_FILES=("$HOME/.bashrc")
+        ;;
+esac
 
 TEMP_FILE=""
+CHECKSUM_FILE=""
 LATEST_VERSION=""
 
 cleanup_temp() {
     if [ -n "$TEMP_FILE" ]; then
         rm -f "$TEMP_FILE"
     fi
+    if [ -n "$CHECKSUM_FILE" ]; then
+        rm -f "$CHECKSUM_FILE"
+    fi
 }
 
 trap cleanup_temp EXIT
+
+# Language metadata: id|name|extensions|type|required tools
+# Extensions are space-separated. The first spelling is used for display.
+LANGUAGES=(
+    "c|C|c|compiled|$C_COMPILER"
+    "cpp|C++|cpp|compiled|$CPP_COMPILER"
+    "python|Python|py|interpreted|python3"
+    "r|R|r R|interpreted|Rscript"
+    "java|Java|java|compiled|java javac"
+    "rust|Rust|rs|compiled|rustc"
+    "javascript|JavaScript|js|interpreted|node"
+    "typescript|TypeScript|ts|interpreted|tsx"
+    "go|Go|go|compiled|go"
+    "php|PHP|php|interpreted|php"
+    "ruby|Ruby|rb|interpreted|ruby"
+    "bash|Bash|sh|interpreted|bash"
+    "swift|Swift|swift|compiled|swift swiftc"
+    "kotlin|Kotlin|kt|compiled|kotlinc java"
+    "lua|Lua|lua|interpreted|lua"
+    "perl|Perl|pl|interpreted|perl"
+    "julia|Julia|jl|interpreted|julia"
+    "dart|Dart|dart|interpreted|dart"
+    "elixir|Elixir|exs|interpreted|elixir"
+    "zig|Zig|zig|compiled|zig"
+    "nim|Nim|nim|compiled|nim"
+    "fortran|Fortran|f90 f95 f03 f08 for f|compiled|gfortran"
+    "pascal|Pascal|pas|compiled|fpc"
+    "crystal|Crystal|cr|compiled|crystal"
+    "csharp|C#|cs|interpreted|dotnet"
+    "fsharp|F#|fsx fs|interpreted|dotnet"
+)
+
+LANGUAGE_COUNT="${#LANGUAGES[@]}"
+
+QUIET=0
+
+log_info() {
+    if [ "$QUIET" -eq 0 ]; then
+        echo "$@"
+    fi
+}
+
+lowercase() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
 
 show_help() {
     echo "coderun $CODERUN_VERSION"
     echo
     cat <<'EOF'
 Usage:
-  coderun <file>
+  coderun [options] <file> [program args...]
   coderun --compile <file>
   coderun --clean <file>
-  coderun -o <output> <file>
+  coderun -o <output> <file> [program args...]
+  coderun --check [language] [--strict]
 
-Run source files in 19 languages with one command.
+Run source files in 26 languages with one command.
+Everything after <file> is passed to the program unchanged.
 
 Help:
   -h, --help           Show this help message
@@ -42,116 +106,329 @@ Help:
 
 Information:
       --list           List supported languages
-      --check          Check required compilers and runtimes
+      --list --verbose List languages and whether their tools are installed
+      --check          Check required compilers and runtimes (exit 0)
+      --check <lang>   Check one language (exit 1 when it is missing)
+      --check --strict Exit 1 when any dependency is missing
       --info           Show system and installation information
       --check-update   Check for a newer coderun release
 
 Maintenance:
       --update         Update coderun to the latest version
       --uninstall      Remove coderun from this system
+      --completions <shell>
+                       Print completions (bash, zsh, fish, powershell)
 
 Execution:
       --compile        Compile without running
       --clean          Remove generated build artifacts
   -o, --output <file>  Set the output artifact for compiled languages
+      --runtime <name> Use node, bun, or deno for JavaScript/TypeScript
+      --time           Report elapsed time after running or compiling
+  -q, --quiet          Suppress coderun's own informational messages
 
 Supported languages:
   C (.c), C++ (.cpp), Python (.py), R (.R, .r), Java (.java),
   Rust (.rs), JavaScript (.js), TypeScript (.ts), Go (.go), PHP (.php),
   Ruby (.rb), Bash (.sh), Swift (.swift), Kotlin (.kt), Lua (.lua),
-  Perl (.pl), Julia (.jl), Dart (.dart), Elixir (.exs)
+  Perl (.pl), Julia (.jl), Dart (.dart), Elixir (.exs), Zig (.zig),
+  Nim (.nim), Fortran (.f90), Pascal (.pas), Crystal (.cr), C# (.cs),
+  F# (.fsx, .fs)
 
 Examples:
   coderun main.cpp
-  coderun main.py
+  coderun main.py --verbose
+  coderun main.cpp input.txt
   coderun --compile main.cpp
-  coderun -o app main.cpp
+  coderun -o app main.cpp --port 8080
+  coderun --runtime bun app.ts
   coderun --clean main.cpp
+  coderun --check python
+  coderun --check --strict
 
 Note: The required compiler or runtime must be installed and on PATH.
 EOF
 }
 
-show_languages() {
-    echo "Supported languages:"
-    echo
-    printf '  %-12s %-14s %s\n' "Language" "Extensions" "Type"
-    printf '  %-12s %-14s %s\n' "C" ".c" "compiled"
-    printf '  %-12s %-14s %s\n' "C++" ".cpp" "compiled"
-    printf '  %-12s %-14s %s\n' "Python" ".py" "interpreted"
-    printf '  %-12s %-14s %s\n' "R" ".r, .R" "interpreted"
-    printf '  %-12s %-14s %s\n' "Java" ".java" "compiled"
-    printf '  %-12s %-14s %s\n' "Rust" ".rs" "compiled"
-    printf '  %-12s %-14s %s\n' "JavaScript" ".js" "interpreted"
-    printf '  %-12s %-14s %s\n' "TypeScript" ".ts" "interpreted"
-    printf '  %-12s %-14s %s\n' "Go" ".go" "compiled"
-    printf '  %-12s %-14s %s\n' "PHP" ".php" "interpreted"
-    printf '  %-12s %-14s %s\n' "Ruby" ".rb" "interpreted"
-    printf '  %-12s %-14s %s\n' "Bash" ".sh" "interpreted"
-    printf '  %-12s %-14s %s\n' "Swift" ".swift" "compiled"
-    printf '  %-12s %-14s %s\n' "Kotlin" ".kt" "compiled"
-    printf '  %-12s %-14s %s\n' "Lua" ".lua" "interpreted"
-    printf '  %-12s %-14s %s\n' "Perl" ".pl" "interpreted"
-    printf '  %-12s %-14s %s\n' "Julia" ".jl" "interpreted"
-    printf '  %-12s %-14s %s\n' "Dart" ".dart" "interpreted"
-    printf '  %-12s %-14s %s\n' "Elixir" ".exs" "interpreted"
-}
-
-CHECK_FAILURES=0
-
-check_tool_group() {
-    local name="$1"
-    shift
-    local missing=""
+missing_tools() {
+    local tools="$1"
     local cmd
+    local missing=""
 
-    for cmd in "$@"; do
+    for cmd in $tools; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             missing="$missing $cmd"
         fi
     done
 
-    if [ -z "$missing" ]; then
-        printf '  %-13s ok\n' "$name"
+    MISSING_TOOLS="${missing# }"
+}
+
+format_extensions() {
+    local exts="$1"
+    local ext
+    local result=""
+
+    for ext in $exts; do
+        if [ -z "$result" ]; then
+            result=".$ext"
+        else
+            result="$result, .$ext"
+        fi
+    done
+
+    printf '%s' "$result"
+}
+
+show_languages() {
+    local verbose="$1"
+    local spec id name exts type tools status
+
+    echo "Supported languages:"
+    echo
+
+    if [ "$verbose" -eq 1 ]; then
+        printf '  %-12s %-25s %-12s %s\n' "Language" "Extensions" "Type" "Status"
     else
-        printf '  %-13s missing:%s\n' "$name" "$missing"
-        CHECK_FAILURES=$((CHECK_FAILURES + 1))
+        printf '  %-12s %-25s %s\n' "Language" "Extensions" "Type"
     fi
+
+    for spec in "${LANGUAGES[@]}"; do
+        IFS='|' read -r id name exts type tools <<< "$spec"
+
+        if [ "$verbose" -eq 1 ]; then
+            missing_tools "$tools"
+            if [ -z "$MISSING_TOOLS" ]; then
+                status="installed"
+            else
+                status="missing: $MISSING_TOOLS"
+            fi
+            printf '  %-12s %-25s %-12s %s\n' "$name" "$(format_extensions "$exts")" "$type" "$status"
+        else
+            printf '  %-12s %-25s %s\n' "$name" "$(format_extensions "$exts")" "$type"
+        fi
+    done
+}
+
+find_language() {
+    local target
+    local spec id name exts type tools
+    local ext
+
+    target="$(lowercase "$1")"
+    target="${target#.}"
+
+    case "$target" in
+        golang) target="go" ;;
+        js) target="javascript" ;;
+        ts) target="typescript" ;;
+        cxx) target="cpp" ;;
+        py) target="python" ;;
+    esac
+
+    for spec in "${LANGUAGES[@]}"; do
+        IFS='|' read -r id name exts type tools <<< "$spec"
+
+        if [ "$(lowercase "$id")" = "$target" ] || [ "$(lowercase "$name")" = "$target" ]; then
+            LANG_ID="$id"
+            LANG_NAME="$name"
+            LANG_TYPE="$type"
+            LANG_TOOLS="$tools"
+            return 0
+        fi
+
+        for ext in $exts; do
+            if [ "$(lowercase "$ext")" = "$target" ]; then
+                LANG_ID="$id"
+                LANG_NAME="$name"
+                    LANG_TYPE="$type"
+                LANG_TOOLS="$tools"
+                return 0
+            fi
+        done
+
+        for ext in $tools; do
+            if [ "$(lowercase "$ext")" = "$target" ]; then
+                LANG_ID="$id"
+                LANG_NAME="$name"
+                    LANG_TYPE="$type"
+                LANG_TOOLS="$tools"
+                return 0
+            fi
+        done
+    done
+
+    return 1
+}
+
+resolve_extension() {
+    local spec id name exts type tools
+    local ext
+
+    for spec in "${LANGUAGES[@]}"; do
+        IFS='|' read -r id name exts type tools <<< "$spec"
+
+        for ext in $exts; do
+            if [ "$(lowercase "$ext")" = "$1" ]; then
+                LANG_ID="$id"
+                LANG_NAME="$name"
+                    LANG_TYPE="$type"
+                LANG_TOOLS="$tools"
+                return 0
+            fi
+        done
+    done
+
+    return 1
 }
 
 check_dependencies() {
+    local target="$1"
+    local strict="$2"
+    local spec id name exts type tools
+    local available=0
+    local failures=0
+
+    if [ -n "$target" ]; then
+        if ! find_language "$target"; then
+            echo "Unknown language: $target"
+            echo "Run 'coderun --list' to see supported languages."
+            return 1
+        fi
+
+        missing_tools "$LANG_TOOLS"
+        if [ -z "$MISSING_TOOLS" ]; then
+            printf '%s: ok\n' "$LANG_NAME"
+            return 0
+        fi
+
+        printf '%s: missing: %s\n' "$LANG_NAME" "$MISSING_TOOLS"
+        return 1
+    fi
+
     echo "Checking required compilers and runtimes:"
     echo
 
-    check_tool_group "C" "$C_COMPILER"
-    check_tool_group "C++" "$CPP_COMPILER"
-    check_tool_group "Python" python3
-    check_tool_group "R" Rscript
-    check_tool_group "Java" java javac
-    check_tool_group "Rust" rustc
-    check_tool_group "JavaScript" node
-    check_tool_group "TypeScript" tsx
-    check_tool_group "Go" go
-    check_tool_group "PHP" php
-    check_tool_group "Ruby" ruby
-    check_tool_group "Bash" bash
-    check_tool_group "Swift" swift swiftc
-    check_tool_group "Kotlin" kotlinc java
-    check_tool_group "Lua" lua
-    check_tool_group "Perl" perl
-    check_tool_group "Julia" julia
-    check_tool_group "Dart" dart
-    check_tool_group "Elixir" elixir
+    for spec in "${LANGUAGES[@]}"; do
+        IFS='|' read -r id name exts type tools <<< "$spec"
+        missing_tools "$tools"
+
+        if [ -z "$MISSING_TOOLS" ]; then
+            printf '  %-13s ok\n' "$name"
+            available=$((available + 1))
+        else
+            printf '  %-13s missing: %s\n' "$name" "$MISSING_TOOLS"
+            failures=$((failures + 1))
+        fi
+    done
 
     echo
+    echo "$available of $LANGUAGE_COUNT language toolchains are available."
 
-    if [ "$CHECK_FAILURES" -eq 0 ]; then
-        echo "All dependencies are available."
-        return 0
+    if [ "$strict" -eq 1 ] && [ "$failures" -ne 0 ]; then
+        echo "Some dependencies are missing. Install the missing tools and try again."
+        return 1
     fi
 
-    echo "Some dependencies are missing. Install the missing tools and try again."
-    return 1
+    if [ "$strict" -eq 0 ]; then
+        echo "Run 'coderun --check <language>' to require a specific toolchain."
+    fi
+
+    return 0
+}
+
+show_completions() {
+    case "$1" in
+        bash)
+            cat <<'EOF'
+# bash completion for coderun
+_coderun() {
+    local cur opts
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    opts="-h --help -v --version --list --verbose --check --strict --info --check-update --update --uninstall --compile --clean -o --output --runtime --time -q --quiet --completions"
+    if [ "$COMP_CWORD" -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+    fi
+    COMPREPLY+=( $(compgen -f -- "$cur") )
+}
+complete -F _coderun coderun
+EOF
+            ;;
+        zsh)
+            cat <<'EOF'
+#compdef coderun
+_coderun() {
+    _arguments \
+        '(-h --help)'{-h,--help}'[show help]' \
+        '(-v --version)'{-v,--version}'[show version]' \
+        '--list[list supported languages]' \
+        '--verbose[show tool status with --list]' \
+        '--check[check toolchains]' \
+        '--strict[fail when tools are missing]' \
+        '--info[show system information]' \
+        '--check-update[check for a newer release]' \
+        '--update[update coderun]' \
+        '--uninstall[remove coderun]' \
+        '--compile[compile only]' \
+        '--clean[remove build artifacts]' \
+        '(-o --output)'{-o,--output}'[set output artifact]:file:_files' \
+        '--runtime[choose JavaScript/TypeScript runtime]:runtime:(node bun deno)' \
+        '--time[report elapsed time]' \
+        '(-q --quiet)'{-q,--quiet}'[suppress informational messages]' \
+        '--completions[print completions]:shell:(bash zsh fish powershell)' \
+        '*:file:_files'
+}
+_coderun "$@"
+EOF
+            ;;
+        fish)
+            cat <<'EOF'
+# fish completion for coderun
+complete -c coderun -f
+complete -c coderun -s h -l help -d 'Show help'
+complete -c coderun -s v -l version -d 'Show version'
+complete -c coderun -l list -d 'List supported languages'
+complete -c coderun -l verbose -d 'Show tool status with --list'
+complete -c coderun -l check -d 'Check toolchains'
+complete -c coderun -l strict -d 'Fail when tools are missing'
+complete -c coderun -l info -d 'Show system information'
+complete -c coderun -l check-update -d 'Check for updates'
+complete -c coderun -l update -d 'Update coderun'
+complete -c coderun -l uninstall -d 'Remove coderun'
+complete -c coderun -l compile -d 'Compile only'
+complete -c coderun -l clean -d 'Remove build artifacts'
+complete -c coderun -s o -l output -r -d 'Set output artifact'
+complete -c coderun -l runtime -r -a 'node bun deno' -d 'Choose runtime'
+complete -c coderun -l time -d 'Report elapsed time'
+complete -c coderun -s q -l quiet -d 'Suppress informational messages'
+complete -c coderun -l completions -r -a 'bash zsh fish powershell' -d 'Print completions'
+complete -c coderun -F
+EOF
+            ;;
+        powershell|pwsh)
+            cat <<'EOF'
+# PowerShell completion for coderun
+Register-ArgumentCompleter -Native -CommandName coderun -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    $options = @(
+        '-h', '--help', '-v', '--version', '--list', '--verbose', '--check',
+        '--strict', '--info', '--check-update', '--update', '--uninstall',
+        '--compile', '--clean', '-o', '--output', '--runtime', '--time',
+        '-q', '--quiet', '--completions'
+    )
+    $options | Where-Object { $_ -like "$wordToComplete*" } |
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterName', $_)
+        }
+}
+EOF
+            ;;
+        *)
+            echo "Error: unknown shell: $1"
+            echo "Supported shells: bash, zsh, fish, powershell."
+            return 1
+            ;;
+    esac
 }
 
 resolve_script_path() {
@@ -192,6 +469,8 @@ show_info() {
     echo "Operating system: $os_name"
     echo "Architecture: $arch"
     echo "Shell: ${SHELL:-unknown}"
+    echo "Languages: $LANGUAGE_COUNT"
+    echo "Runner URL: $CODERUN_RAW_BASE/v$CODERUN_VERSION/$RUNNER_PATH"
 }
 
 choose_downloader() {
@@ -218,6 +497,16 @@ download_file() {
     fi
 }
 
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+
 version_greater() {
     local left="$1"
     local right="$2"
@@ -240,29 +529,12 @@ version_greater() {
     return 1
 }
 
-check_update() {
-    echo "Current version: $CODERUN_VERSION"
-    echo "Checking for updates..."
-
-    fetch_latest_version || exit 1
-
-    echo "Latest version: $LATEST_VERSION"
-
-    if version_greater "$LATEST_VERSION" "$CODERUN_VERSION"; then
-        echo "A new version is available. Run 'coderun --update' to install it."
-        exit 1
-    fi
-
-    echo "coderun is up to date."
-    exit 0
-}
-
 fetch_latest_version() {
     local status
 
     TEMP_FILE="${TMPDIR:-/tmp}/coderun-version.$$"
 
-    download_file "$VERSION_URL" "$TEMP_FILE"
+    download_file "$CODERUN_RAW_BASE/main/VERSION" "$TEMP_FILE"
     status=$?
 
     if [ "$status" -eq 127 ]; then
@@ -285,13 +557,35 @@ fetch_latest_version() {
     return 0
 }
 
+check_update() {
+    echo "Current version: $CODERUN_VERSION"
+    echo "Checking for updates..."
+
+    fetch_latest_version || exit 1
+
+    echo "Latest version: $LATEST_VERSION"
+
+    if version_greater "$LATEST_VERSION" "$CODERUN_VERSION"; then
+        echo "A new version is available. Run 'coderun --update' to install it."
+        exit 1
+    fi
+
+    echo "coderun is up to date."
+    exit 0
+}
+
 update_coderun() {
     local target="$INSTALL_DIR/coderun"
     local status
+    local runner_url
+    local checksums_url
+    local downloaded_version
+    local expected
+    local actual
 
     if [ ! -f "$target" ]; then
         echo "Error: coderun is not installed at $target."
-        echo "Run ./install-mac.sh from the repository first."
+        echo "Run $INSTALLER_HINT from the repository first."
         exit 1
     fi
 
@@ -311,10 +605,14 @@ update_coderun() {
 
     rm -f "$TEMP_FILE"
     TEMP_FILE="$target.tmp.$$"
+    CHECKSUM_FILE="${TMPDIR:-/tmp}/coderun-checksums.$$"
+
+    runner_url="$CODERUN_RAW_BASE/v$LATEST_VERSION/$RUNNER_PATH"
+    checksums_url="$CODERUN_RAW_BASE/v$LATEST_VERSION/SHA256SUMS"
 
     echo "Updating coderun to $LATEST_VERSION..."
 
-    download_file "$UPDATE_URL" "$TEMP_FILE"
+    download_file "$runner_url" "$TEMP_FILE"
     status=$?
 
     if [ "$status" -eq 127 ]; then
@@ -332,12 +630,62 @@ update_coderun() {
         exit 1
     fi
 
+    downloaded_version="$(sed -n 's/^CODERUN_VERSION="\([0-9][0-9.]*\)"$/\1/p' "$TEMP_FILE" | head -n 1)"
+
+    if [ "$downloaded_version" != "$LATEST_VERSION" ]; then
+        echo "Error: downloaded runner version does not match $LATEST_VERSION."
+        exit 1
+    fi
+
+    if ! download_file "$checksums_url" "$CHECKSUM_FILE"; then
+        echo "Error: could not download SHA256SUMS for $LATEST_VERSION."
+        exit 1
+    fi
+
+    expected="$(awk -v path="$RUNNER_PATH" '$2 == path { print $1; exit }' "$CHECKSUM_FILE")"
+
+    if [ -z "$expected" ]; then
+        echo "Error: SHA256SUMS does not contain $RUNNER_PATH."
+        exit 1
+    fi
+
+    actual="$(sha256_file "$TEMP_FILE")" || {
+        echo "Error: sha256sum or shasum is required to verify updates."
+        exit 1
+    }
+
+    if [ "$(lowercase "$expected")" != "$(lowercase "$actual")" ]; then
+        echo "Error: update checksum verification failed."
+        exit 1
+    fi
+
     if ! chmod 755 "$TEMP_FILE" || ! mv "$TEMP_FILE" "$target"; then
         echo "Error: could not replace $target."
         exit 1
     fi
 
+    rm -f "$CHECKSUM_FILE"
+    CHECKSUM_FILE=""
+    TEMP_FILE=""
+
     echo "coderun updated successfully to $LATEST_VERSION."
+}
+
+remove_path_entry() {
+    local config="$1"
+    local line='export PATH="$HOME/.local/bin:$PATH"'
+    local temp="$config.coderun.$$"
+
+    if [ ! -f "$config" ]; then
+        return 0
+    fi
+
+    if grep -qF "$line" "$config" 2>/dev/null; then
+        grep -vF "$line" "$config" > "$temp" 2>/dev/null || true
+        cat "$temp" > "$config"
+        rm -f "$temp"
+        echo "Removed coderun PATH entry from $config"
+    fi
 }
 
 uninstall_coderun() {
@@ -362,10 +710,7 @@ uninstall_coderun() {
 
     if [ "$install_dir_empty" -eq 1 ]; then
         for config in "${CONFIG_FILES[@]}"; do
-            if [ -f "$config" ] && grep -qF 'export PATH="$HOME/.local/bin:$PATH"' "$config"; then
-                sed "${SED_INPLACE[@]}" '/^export PATH="\$HOME\/\.local\/bin:\$PATH"$/d' "$config"
-                echo "Removed coderun PATH entry from $config"
-            fi
+            remove_path_entry "$config"
         done
 
         rmdir "$INSTALL_DIR" 2>/dev/null || true
@@ -381,33 +726,19 @@ uninstall_coderun() {
     fi
 }
 
-is_supported() {
-    case "$ext" in
-        c|cpp|py|r|java|rs|js|ts|go|php|rb|sh|swift|kt|lua|pl|jl|dart|exs)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-is_compiled() {
-    case "$ext" in
-        c|cpp|java|rs|go|swift|kt)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
+compiled_artifact_extension() {
+    if [ "$LANG_ID" = "kotlin" ]; then
+        printf '.jar'
+    else
+        printf ''
+    fi
 }
 
 compile_artifact() {
     if [ -n "$output_opt" ]; then
-        case "$ext" in
-            kt)
-                case "$(basename "$output_opt")" in
+        case "$LANG_ID" in
+            kotlin)
+                case "${output_opt##*/}" in
                     *.*)
                         COMPILE_OUTPUT="$output_opt"
                         ;;
@@ -421,15 +752,15 @@ compile_artifact() {
                 ;;
         esac
     else
-        case "$ext" in
-            c|cpp|rs|go|swift)
-                COMPILE_OUTPUT="$dir/$base"
-                ;;
-            kt)
-                COMPILE_OUTPUT="$dir/$base.jar"
-                ;;
+        case "$LANG_ID" in
             java)
                 COMPILE_OUTPUT="$dir"
+                ;;
+            kotlin)
+                COMPILE_OUTPUT="$dir/$base.jar"
+                ;;
+            *)
+                COMPILE_OUTPUT="$dir/$base"
                 ;;
         esac
     fi
@@ -449,7 +780,7 @@ resolve_output_path() {
 compile_file() {
     compile_artifact
 
-    case "$ext" in
+    case "$LANG_ID" in
         cpp)
             "$CPP_COMPILER" "$file" -o "$COMPILE_OUTPUT"
             return $?
@@ -462,7 +793,7 @@ compile_file() {
             javac "$file" -d "$dir"
             return $?
             ;;
-        rs)
+        rust)
             rustc "$file" -o "$COMPILE_OUTPUT"
             return $?
             ;;
@@ -474,8 +805,116 @@ compile_file() {
             swiftc "$file" -o "$COMPILE_OUTPUT"
             return $?
             ;;
-        kt)
+        kotlin)
             kotlinc "$file" -include-runtime -d "$COMPILE_OUTPUT"
+            return $?
+            ;;
+        zig)
+            zig build-exe "$file" -femit-bin="$COMPILE_OUTPUT"
+            return $?
+            ;;
+        nim)
+            nim c --out:"$COMPILE_OUTPUT" "$file"
+            return $?
+            ;;
+        fortran)
+            gfortran "$file" -o "$COMPILE_OUTPUT"
+            return $?
+            ;;
+        pascal)
+            fpc "$file" "-o$COMPILE_OUTPUT"
+            return $?
+            ;;
+        crystal)
+            crystal build "$file" -o "$COMPILE_OUTPUT"
+            return $?
+            ;;
+    esac
+
+    return 1
+}
+
+run_javascript() {
+    local runtime="${runtime_opt:-node}"
+
+    case "$runtime" in
+        node)
+            node "$file" "$@"
+            ;;
+        bun)
+            bun run "$file" "$@"
+            ;;
+        deno)
+            deno run "$file" "$@"
+            ;;
+    esac
+}
+
+run_typescript() {
+    local runtime="${runtime_opt:-tsx}"
+
+    case "$runtime" in
+        node)
+            node "$file" "$@"
+            ;;
+        bun)
+            bun run "$file" "$@"
+            ;;
+        deno)
+            deno run "$file" "$@"
+            ;;
+        tsx)
+            tsx "$file" "$@"
+            ;;
+    esac
+}
+
+run_compiled() {
+    local target
+
+    if [ -n "$output_opt" ]; then
+        compile_file || return $?
+
+        if [ "$LANG_ID" = "kotlin" ]; then
+            java -jar "$COMPILE_OUTPUT" "$@"
+            return $?
+        fi
+
+        target="$(resolve_output_path "$COMPILE_OUTPUT")"
+        "$target" "$@"
+        return $?
+    fi
+
+    case "$LANG_ID" in
+        c|cpp|rust|fortran|pascal)
+            compile_file || return $?
+            target="$(resolve_output_path "$COMPILE_OUTPUT")"
+            "$target" "$@"
+            return $?
+            ;;
+        kotlin)
+            compile_file || return $?
+            java -jar "$COMPILE_OUTPUT" "$@"
+            return $?
+            ;;
+        go)
+            go run "$file" "$@"
+            return $?
+            ;;
+        swift)
+            swift "$file" "$@"
+            return $?
+            ;;
+        zig)
+            zig run "$file" -- "$@"
+            return $?
+            ;;
+        nim)
+            nim r "$file" -- "$@"
+            return $?
+            ;;
+        crystal)
+            crystal run "$file" -- "$@"
             return $?
             ;;
     esac
@@ -484,98 +923,78 @@ compile_file() {
 }
 
 run_file() {
-    local target
-
-    case "$ext" in
-        py)
-            python3 "$file"
+    case "$LANG_ID" in
+        python)
+            python3 "$file" "$@"
             return $?
             ;;
         r)
-            Rscript "$file"
+            Rscript "$file" "$@"
             return $?
             ;;
-        js)
-            node "$file"
+        javascript)
+            run_javascript "$@"
             return $?
             ;;
-        ts)
-            tsx "$file"
+        typescript)
+            run_typescript "$@"
             return $?
             ;;
         php)
-            php "$file"
+            php "$file" "$@"
             return $?
             ;;
-        rb)
-            ruby "$file"
+        ruby)
+            ruby "$file" "$@"
             return $?
             ;;
-        sh)
-            bash "$file"
+        bash)
+            bash "$file" "$@"
             return $?
             ;;
         lua)
-            lua "$file"
+            lua "$file" "$@"
             return $?
             ;;
-        pl)
-            perl "$file"
+        perl)
+            perl "$file" "$@"
             return $?
             ;;
-        jl)
-            julia "$file"
+        julia)
+            julia "$file" "$@"
             return $?
             ;;
         dart)
-            dart run "$file"
+            dart run "$file" "$@"
             return $?
             ;;
-        exs)
-            elixir "$file"
+        elixir)
+            elixir "$file" "$@"
+            return $?
+            ;;
+        csharp)
+            if [ $# -gt 0 ]; then
+                dotnet run "$file" -- "$@"
+            else
+                dotnet run "$file"
+            fi
+            return $?
+            ;;
+        fsharp)
+            dotnet fsi "$file" "$@"
             return $?
             ;;
         java)
-            java "$file"
+            java "$file" "$@"
             return $?
             ;;
-        cpp|c|rs|kt|go|swift)
-            if [ -n "$output_opt" ]; then
-                compile_file || return $?
-
-                if [ "$ext" = "kt" ]; then
-                    java -jar "$COMPILE_OUTPUT"
-                    return $?
-                fi
-
-                target="$(resolve_output_path "$COMPILE_OUTPUT")"
-                "$target"
-                return $?
-            fi
-
-            case "$ext" in
-                cpp|c|rs)
-                    compile_file || return $?
-                    target="$(resolve_output_path "$COMPILE_OUTPUT")"
-                    "$target"
-                    return $?
-                    ;;
-                kt)
-                    compile_file || return $?
-                    java -jar "$COMPILE_OUTPUT"
-                    return $?
-                    ;;
-                go)
-                    go run "$file"
-                    return $?
-                    ;;
-                swift)
-                    swift "$file"
-                    return $?
-                    ;;
-            esac
+        c|cpp|rust|go|swift|kotlin|zig|nim|fortran|pascal|crystal)
+            run_compiled "$@"
+            return $?
             ;;
     esac
+
+    return 1
 }
 
 CLEANED=0
@@ -584,7 +1003,7 @@ CLEAN_FAILED=0
 remove_artifact() {
     if [ -e "$1" ]; then
         if rm -f "$1"; then
-            echo "Removed $1"
+            log_info "Removed $1"
             CLEANED=1
         else
             echo "Error: could not remove $1."
@@ -597,17 +1016,15 @@ clean_file() {
     local class_file
     local custom_artifact
 
-    case "$ext" in
-        py|r|js|ts|php|rb|sh|lua|pl|jl|dart|exs)
-            echo "No build artifacts to clean for .$ext files (interpreted language)."
-            return 0
-            ;;
-    esac
+    if [ "$LANG_TYPE" = "interpreted" ]; then
+        log_info "No build artifacts to clean for .$ext files (interpreted language)."
+        return 0
+    fi
 
     if [ -n "$output_opt" ]; then
-        case "$ext" in
-            kt)
-                case "$(basename "$output_opt")" in
+        case "$LANG_ID" in
+            kotlin)
+                case "${output_opt##*/}" in
                     *.*)
                         custom_artifact="$output_opt"
                         ;;
@@ -617,18 +1034,27 @@ clean_file() {
                 esac
                 remove_artifact "$custom_artifact"
                 ;;
-            c|cpp|rs|go|swift)
+            java)
+                ;;
+            *)
                 remove_artifact "$output_opt"
                 ;;
         esac
     fi
 
-    case "$ext" in
-        c|cpp|rs|go|swift)
+    case "$LANG_ID" in
+        c|cpp|rust|go|swift|fortran|pascal|crystal)
             remove_artifact "$dir/$base"
             ;;
-        kt)
+        kotlin)
             remove_artifact "$dir/$base.jar"
+            ;;
+        zig)
+            remove_artifact "$dir/$base"
+            remove_artifact "$dir/$base.o"
+            ;;
+        nim)
+            remove_artifact "$dir/$base"
             ;;
         java)
             remove_artifact "$dir/$base.class"
@@ -641,7 +1067,7 @@ clean_file() {
     esac
 
     if [ "$CLEANED" -eq 0 ]; then
-        echo "No build artifacts found for $file."
+        log_info "No build artifacts found for $file."
     fi
 
     if [ "$CLEAN_FAILED" -ne 0 ]; then
@@ -649,6 +1075,42 @@ clean_file() {
     fi
 
     return 0
+}
+
+now_ms() {
+    local value
+
+    if value="$(date +%s%N 2>/dev/null)" && [[ "$value" =~ ^[0-9]+$ ]]; then
+        printf '%s\n' "$((value / 1000000))"
+        return
+    fi
+
+    if command -v perl >/dev/null 2>&1; then
+        perl -MTime::HiRes=time -e 'printf "%.0f\n", time * 1000'
+        return
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import time; print(int(time.time() * 1000))'
+        return
+    fi
+
+    printf '%s000\n' "$(date +%s)"
+}
+
+report_elapsed() {
+    local start="$1"
+    local end
+    local elapsed
+
+    end="$(now_ms)"
+    elapsed=$((end - start))
+
+    if [ "$elapsed" -lt 0 ]; then
+        elapsed=0
+    fi
+
+    printf 'coderun: %d.%03ds\n' "$((elapsed / 1000))" "$((elapsed % 1000))" >&2
 }
 
 set_mode() {
@@ -659,11 +1121,37 @@ set_mode() {
     mode="$1"
 }
 
+set_action() {
+    if [ -n "$action" ] && [ "$action" != "$1" ]; then
+        echo "Error: --$action and --$1 cannot be combined."
+        exit 1
+    fi
+    action="$1"
+}
+
 mode="run"
+action=""
 output_opt=""
+runtime_opt=""
+check_target=""
+check_strict=0
+list_verbose=0
+time_it=0
+completion_shell=""
 file=""
+program_args=()
 
 while [ $# -gt 0 ]; do
+    if [ -n "$file" ]; then
+        if [ "${#program_args[@]}" -eq 0 ] && [ "$1" = "--" ]; then
+            shift
+        fi
+        if [ $# -gt 0 ]; then
+            program_args=("$@")
+        fi
+        break
+    fi
+
     case "$1" in
         -h|--help)
             show_help
@@ -674,28 +1162,37 @@ while [ $# -gt 0 ]; do
             exit 0
             ;;
         --list)
-            show_languages
-            exit 0
+            set_action "list"
+            ;;
+        --verbose)
+            list_verbose=1
             ;;
         --check)
-            check_dependencies
-            exit $?
+            set_action "check"
+            ;;
+        --strict)
+            check_strict=1
             ;;
         --info)
-            show_info
-            exit 0
+            set_action "info"
             ;;
         --check-update)
-            check_update
-            exit $?
+            set_action "check-update"
             ;;
         --update)
-            update_coderun
-            exit 0
+            set_action "update"
             ;;
         --uninstall)
-            uninstall_coderun
-            exit 0
+            set_action "uninstall"
+            ;;
+        --completions)
+            if [ $# -lt 2 ] || [ -z "$2" ]; then
+                echo "Error: --completions requires a shell name."
+                exit 1
+            fi
+            set_action "completions"
+            completion_shell="$2"
+            shift
             ;;
         --compile)
             set_mode "compile"
@@ -711,15 +1208,28 @@ while [ $# -gt 0 ]; do
             output_opt="$2"
             shift
             ;;
+        --runtime)
+            if [ $# -lt 2 ] || [ -z "$2" ]; then
+                echo "Error: --runtime requires a value: node, bun, or deno."
+                exit 1
+            fi
+            runtime_opt="$2"
+            shift
+            ;;
+        --time)
+            time_it=1
+            ;;
+        -q|--quiet)
+            QUIET=1
+            ;;
         --)
             shift
-            if [ -z "$file" ] && [ $# -gt 0 ]; then
+            if [ $# -gt 0 ]; then
                 file="$1"
                 shift
             fi
             if [ $# -gt 0 ]; then
-                echo "Error: unexpected argument: $1"
-                exit 1
+                program_args=("$@")
             fi
             break
             ;;
@@ -729,17 +1239,82 @@ while [ $# -gt 0 ]; do
             exit 1
             ;;
         *)
-            if [ -z "$file" ]; then
-                file="$1"
+            if [ "$action" = "check" ] && [ -z "$check_target" ]; then
+                check_target="$1"
             else
-                echo "Error: unexpected argument: $1"
-                exit 1
+                file="$1"
             fi
             ;;
     esac
 
     shift
 done
+
+if [ -n "$action" ]; then
+    if [ "$mode" != "run" ]; then
+        echo "Error: --$action cannot be combined with --compile or --clean."
+        exit 1
+    fi
+
+    if [ -n "$output_opt" ]; then
+        echo "Error: --$action cannot be combined with -o/--output."
+        exit 1
+    fi
+
+    if [ "$action" != "check" ] && [ "$action" != "list" ] && [ -n "$file" ]; then
+        echo "Error: unexpected argument: $file"
+        exit 1
+    fi
+
+    case "$action" in
+        list)
+            if [ -n "$file" ] || [ -n "$check_target" ]; then
+                echo "Error: unexpected argument: ${file:-$check_target}"
+                exit 1
+            fi
+            show_languages "$list_verbose"
+            exit 0
+            ;;
+        check)
+            if [ -n "$file" ]; then
+                echo "Error: unexpected argument: $file"
+                exit 1
+            fi
+            check_dependencies "$check_target" "$check_strict"
+            exit $?
+            ;;
+        info)
+            show_info
+            exit 0
+            ;;
+        check-update)
+            check_update
+            exit $?
+            ;;
+        update)
+            update_coderun
+            exit 0
+            ;;
+        uninstall)
+            uninstall_coderun
+            exit 0
+            ;;
+        completions)
+            show_completions "$completion_shell"
+            exit $?
+            ;;
+    esac
+fi
+
+if [ "$list_verbose" -eq 1 ]; then
+    echo "Error: --verbose can only be used with --list."
+    exit 1
+fi
+
+if [ "$check_strict" -eq 1 ]; then
+    echo "Error: --strict can only be used with --check."
+    exit 1
+fi
 
 if [ "$mode" = "compile" ] || [ "$mode" = "clean" ]; then
     if [ -z "$file" ]; then
@@ -763,31 +1338,62 @@ if [ ! -f "$file" ]; then
     exit 1
 fi
 
-dir="$(dirname "$file")"
-name="$(basename "$file")"
+dir="."
+name="$file"
+
+case "$file" in
+    */*)
+        dir="${file%/*}"
+        name="${file##*/}"
+        if [ -z "$dir" ]; then
+            dir="/"
+        fi
+        ;;
+esac
+
 base="${name%.*}"
 ext="${name##*.}"
-ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
+ext="$(lowercase "$ext")"
 
-if ! is_supported; then
+if ! resolve_extension "$ext"; then
     echo "Unsupported file type: .$ext"
-    echo "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt .lua .pl .jl .dart .exs"
+    echo "Run 'coderun --list' to see supported languages."
     exit 1
 fi
 
-if [ -n "$output_opt" ]; then
-    case "$ext" in
-        c|cpp|rs|go|swift|kt)
+if [ -n "$runtime_opt" ]; then
+    case "$runtime_opt" in
+        node|bun|deno)
             ;;
+        *)
+            echo "Error: unknown runtime: $runtime_opt"
+            echo "Supported runtimes: node, bun, deno."
+            exit 1
+            ;;
+    esac
+
+    case "$LANG_ID" in
+        javascript|typescript)
+            ;;
+        *)
+            echo "Error: --runtime is only supported for JavaScript and TypeScript."
+            exit 1
+            ;;
+    esac
+fi
+
+if [ -n "$output_opt" ]; then
+    case "$LANG_ID" in
         java)
             echo "Error: -o/--output is not supported for Java."
             exit 1
             ;;
-        *)
-            echo "Error: -o/--output is only supported for compiled languages."
-            exit 1
-            ;;
     esac
+
+    if [ "$LANG_TYPE" != "compiled" ]; then
+        echo "Error: -o/--output is only supported for compiled languages."
+        exit 1
+    fi
 
     if [ "$output_opt" = "$file" ]; then
         echo "Error: output path must not be the source file."
@@ -796,15 +1402,29 @@ if [ -n "$output_opt" ]; then
 fi
 
 if [ "$mode" = "clean" ]; then
+    if [ "${#program_args[@]}" -gt 0 ]; then
+        echo "Error: --clean does not accept program arguments."
+        exit 1
+    fi
     clean_file
     exit $?
 fi
 
 if [ "$mode" = "compile" ]; then
-    if ! is_compiled; then
+    if [ "${#program_args[@]}" -gt 0 ]; then
+        echo "Error: --compile does not accept program arguments."
+        exit 1
+    fi
+
+    if [ "$LANG_TYPE" != "compiled" ]; then
         echo "Error: cannot compile .$ext files; this language is interpreted."
         echo "Use 'coderun \"$file\"' to run it directly."
         exit 1
+    fi
+
+    start_time=0
+    if [ "$time_it" -eq 1 ]; then
+        start_time="$(now_ms)"
     fi
 
     compile_file
@@ -814,14 +1434,29 @@ if [ "$mode" = "compile" ]; then
         exit "$status"
     fi
 
-    if [ "$ext" = "java" ]; then
-        echo "Compiled $file -> $dir (Java class files)"
+    if [ "$time_it" -eq 1 ]; then
+        report_elapsed "$start_time"
+    fi
+
+    if [ "$LANG_ID" = "java" ]; then
+        log_info "Compiled $file -> $dir (Java class files)"
     else
-        echo "Compiled $file -> $COMPILE_OUTPUT"
+        log_info "Compiled $file -> $COMPILE_OUTPUT"
     fi
 
     exit 0
 fi
 
-run_file
-exit $?
+start_time=0
+if [ "$time_it" -eq 1 ]; then
+    start_time="$(now_ms)"
+fi
+
+run_file "${program_args[@]}"
+status=$?
+
+if [ "$time_it" -eq 1 ]; then
+    report_elapsed "$start_time"
+fi
+
+exit "$status"

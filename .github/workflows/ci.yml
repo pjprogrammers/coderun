@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unix:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Install ShellCheck (macOS)
+        if: runner.os == 'macOS'
+        run: brew install shellcheck
+
+      - name: Shell syntax
+        run: |
+          bash -n bin/coderun
+          bash -n bin/coderun-mac
+          bash -n coderun
+          bash -n install.sh
+          bash -n install-mac.sh
+          bash -n scripts/sync.sh
+          bash -n scripts/checksums.sh
+          bash -n scripts/check.sh
+          bash -n scripts/release.sh
+          bash -n tests/run-bash-tests.sh
+          bash -n tests/update-bash-tests.sh
+          bash -n tests/installer-tests.sh
+
+      - name: ShellCheck
+        run: shellcheck -S warning bin/coderun install.sh install-mac.sh scripts/*.sh tests/*.sh
+
+      - name: Consistency checks
+        run: ./scripts/check.sh
+
+      - name: Runner tests
+        run: ./tests/run-bash-tests.sh
+
+      - name: macOS dispatch simulation
+        if: runner.os == 'Linux'
+        run: CODERUN_TEST_OS=Darwin ./tests/run-bash-tests.sh
+
+      - name: Update tests
+        run: ./tests/update-bash-tests.sh
+
+      - name: Installer tests
+        run: ./tests/installer-tests.sh
+
+  windows:
+    name: windows-latest
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = @()
+          foreach ($file in @("windows/coderun.ps1", "install.ps1")) {
+            $results += Invoke-ScriptAnalyzer -Path $file -Settings .github/PSScriptAnalyzerSettings.psd1
+          }
+          $results | Format-Table -AutoSize
+          if ($results.Count -gt 0) { exit 1 }
+
+      - name: PowerShell parse and version consistency
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $files = @("windows/coderun.ps1", "install.ps1", "tests/run-powershell-tests.ps1", "tests/installer-tests.ps1")
+          foreach ($file in $files) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Host $_.Message }
+              exit 1
+            }
+          }
+          $match = Select-String -Path windows/coderun.ps1 -Pattern '^\$CoderunVersion\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"'
+          if ($match.Matches[0].Groups[1].Value -ne $version) {
+            Write-Host "Runner version does not match VERSION"
+            exit 1
+          }
+
+      - name: Runner and update tests (PowerShell 7)
+        shell: pwsh
+        run: ./tests/run-powershell-tests.ps1
+
+      - name: Installer tests (PowerShell 7)
+        shell: pwsh
+        run: ./tests/installer-tests.ps1
+
+      - name: Runner and update tests (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./tests/run-powershell-tests.ps1
+
+      - name: Installer tests (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./tests/installer-tests.ps1

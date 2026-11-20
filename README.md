@@ -1,9 +1,9 @@
 # coderun
 
-**Run 19 programming languages with one command — on Linux, macOS, and Windows.**
+**Run 26 programming languages with one command — on Linux, macOS, and Windows.**
 
 [![Latest release](https://img.shields.io/github/v/release/pjprogrammers/coderun?label=release)](https://github.com/pjprogrammers/coderun/releases/latest)
-[![Languages](https://img.shields.io/badge/languages-19-brightgreen)](#supported-languages)
+[![Languages](https://img.shields.io/badge/languages-26-brightgreen)](#supported-languages)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue)](#supported-platforms)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
@@ -57,17 +57,22 @@ Different languages usually mean different commands:
 
 ### Features
 
-- **19 languages** — 7 compiled and 12 interpreted.
+- **26 languages** — 12 compiled and 14 interpreted.
 - **3 platforms** — Linux, macOS, and Windows.
-- **Automatic compilation** for C, C++, Java, Rust, Go, Swift, and Kotlin.
-- **Direct execution** for Python, R, JavaScript, TypeScript, PHP, Ruby, Bash, Lua, Perl, Julia, Dart, and Elixir.
+- **Program argument forwarding** — everything after the source file goes to the program unchanged.
+- **Automatic compilation** for C, C++, Java, Rust, Go, Swift, Kotlin, Zig, Nim, Fortran, Pascal, and Crystal.
+- **Direct execution** for Python, R, JavaScript, TypeScript, PHP, Ruby, Bash, Lua, Perl, Julia, Dart, Elixir, C#, and F#.
+- **Runtime selection** with `--runtime node|bun|deno` for JavaScript and TypeScript.
 - **Compile-only mode** with `--compile`.
-- **Artifact cleanup** with `--clean`, including Java inner classes.
+- **Artifact cleanup** with `--clean`, including Java inner classes and Zig object files.
 - **Custom output names** with `-o` / `--output`.
-- **Dependency checks** with `--check`.
-- **Language listing** with `--list`.
+- **Friendly dependency checks** with `--check`, `--check <language>`, and `--check --strict`.
+- **Language listing** with `--list` and install status with `--list --verbose`.
+- **Shell completions** for Bash, Zsh, Fish, and PowerShell with `--completions`.
+- **Timing and quiet output** with `--time` and `-q` / `--quiet`.
 - **System information** with `--info`.
 - **Update checking and self-update** with `--check-update` and `--update`.
+- **Verified updates** — versioned downloads, embedded-version checks, and SHA-256 verification.
 - **Uninstall with PATH cleanup** using `--uninstall`.
 - **Exit-code preservation** — compiler and program exit codes are never masked.
 - **Path-safe** — filenames with spaces and shell-special characters work.
@@ -78,8 +83,8 @@ Different languages usually mean different commands:
 
 | | |
 | --- | --- |
-| **Current version** | 2.3.1 |
-| **Languages** | 19 — 7 compiled, 12 interpreted |
+| **Current version** | 2.4.0 |
+| **Languages** | 26 — 12 compiled, 14 interpreted |
 | **Operating systems** | 3 — Linux, macOS, Windows |
 | **Interface** | Command line |
 | **Runner runtime** | Bash (Linux/macOS), PowerShell (Windows) |
@@ -95,7 +100,9 @@ Different languages usually mean different commands:
 | macOS | `bin/coderun-mac` | `install-mac.sh` | `~/.local/bin/coderun` | `clang` / `clang++` |
 | Windows | `windows/coderun.ps1` | `install.ps1` | `%USERPROFILE%\bin\coderun.ps1` and `coderun.cmd` | `gcc` / `g++` |
 
-All three runners expose the same 19 languages and the same command-line options. The intentional platform differences are the C/C++ compiler choice and the shell integration.
+`bin/coderun` is the source of truth for Linux and macOS. It detects the platform at startup, and `scripts/sync.sh` generates identical `bin/coderun-mac` and legacy root `coderun` copies for compatibility. The Windows runner is maintained separately in `windows/coderun.ps1`.
+
+All three runners expose the same 26 languages and the same command-line options. The intentional platform differences are the C/C++ compiler choice, Python's executable name, and the shell integration.
 
 ---
 
@@ -109,8 +116,8 @@ All three runners expose the same 19 languages and the same command-line options
 | R | `.R`, `.r` | Interpreted | Run with `Rscript` | `Rscript` |
 | Java | `.java` | Compiled | `java Main.java` (source-file mode) | `java`, `javac` (Java 11+) |
 | Rust | `.rs` | Compiled | Compile, then run the binary | `rustc` |
-| JavaScript | `.js` | Interpreted | Run with `node` | `node` |
-| TypeScript | `.ts` | Interpreted | Run with `tsx` | `tsx` |
+| JavaScript | `.js` | Interpreted | Run with `node` (override with `--runtime bun` or `--runtime deno`) | `node`, `bun`, or `deno` |
+| TypeScript | `.ts` | Interpreted | Run with `tsx` (override with `--runtime node`, `bun`, or `deno`) | `tsx`, `node`, `bun`, or `deno` |
 | Go | `.go` | Compiled | `go run` | `go` |
 | PHP | `.php` | Interpreted | Run with `php` | `php` |
 | Ruby | `.rb` | Interpreted | Run with `ruby` | `ruby` |
@@ -122,8 +129,17 @@ All three runners expose the same 19 languages and the same command-line options
 | Julia | `.jl` | Interpreted | Run directly | `julia` |
 | Dart | `.dart` | Interpreted | Run with `dart run` | `dart` |
 | Elixir | `.exs` | Interpreted | Run directly | `elixir` |
+| Zig | `.zig` | Compiled | `zig run` (or `zig build-exe` with `--compile`) | `zig` |
+| Nim | `.nim` | Compiled | `nim r` (or `nim c` with `--compile`) | `nim` |
+| Fortran | `.f90`, `.f95`, `.f03`, `.f08`, `.for`, `.f` | Compiled | Compile, then run the binary | `gfortran` |
+| Pascal | `.pas` | Compiled | Compile, then run the binary | `fpc` |
+| Crystal | `.cr` | Compiled | `crystal run` (or `crystal build` with `--compile`) | `crystal` |
+| C# | `.cs` | Interpreted | `dotnet run file.cs` (file-based apps, .NET 10+) | `dotnet` |
+| F# | `.fsx`, `.fs` | Interpreted | `dotnet fsi` | `dotnet` |
 
 Extensions are matched case-insensitively. Only the toolchains for the languages you actually use need to be installed. `.pl` is treated as Perl, and `.exs` as an Elixir script.
+
+For JavaScript and TypeScript, `--runtime node|bun|deno` selects the runtime. JavaScript defaults to `node`; TypeScript defaults to `tsx` when no runtime is specified.
 
 ---
 
@@ -135,11 +151,11 @@ Installation prerequisites:
 
 | Platform | Prerequisites |
 | --- | --- |
-| Linux | Bash, `git`, `gcc`, `g++`, `python3` |
-| macOS | Bash, `git`, Apple Command Line Tools (`clang`, `clang++`, `python3`) |
-| Windows | PowerShell, `git`, `gcc`, `g++`, `python` on PATH |
+| Linux | Bash, `git` (clone only); recommended: `gcc`, `g++`, `python3` |
+| macOS | Bash, `git` (clone only); recommended: Apple Command Line Tools (`clang`, `clang++`, `python3`) |
+| Windows | PowerShell, `git` (clone only); recommended: `gcc`, `g++`, `python` on PATH |
 
-`git` is only needed to clone the repository; you can also download the repository as a ZIP. The installer installs the `coderun` command itself and checks a small baseline of tools, but it does not install every language toolchain — see [Requirements and toolchains](#requirements-and-toolchains). After installing, `coderun --check` shows what is ready.
+`git` is only needed to clone the repository; you can also download the repository as a ZIP. The installer always installs `coderun` itself and prints warnings for missing baseline tools instead of failing. No language toolchain is required to install or update `coderun` — see [Requirements and toolchains](#requirements-and-toolchains). After installing, `coderun --check` shows what is ready.
 
 All three installers are user-level and do not require administrator access for `coderun` itself. Installing language toolchains may require administrator access depending on the tool.
 
@@ -153,7 +169,7 @@ cd coderun
 
 The installer:
 
-- verifies `gcc`, `g++`, and `python3`;
+- warns when `gcc`, `g++`, or `python3` are missing, but continues;
 - copies the runner to `~/.local/bin/coderun`;
 - adds `~/.local/bin` to `~/.bashrc` if needed;
 - makes the command executable.
@@ -176,7 +192,7 @@ cd coderun
 
 The installer:
 
-- verifies `clang`, `clang++`, and `python3`;
+- warns when `clang`, `clang++`, or `python3` are missing, but continues;
 - copies the runner to `~/.local/bin/coderun`;
 - adds the directory to `~/.zshrc`, or `~/.zprofile` when `.zshrc` does not exist;
 - makes the command executable.
@@ -213,7 +229,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 The installer:
 
-- verifies `gcc`, `g++`, and `python`;
+- warns when `gcc`, `g++`, or `python` are missing, but continues;
 - copies the runner to `%USERPROFILE%\bin\coderun.ps1`;
 - creates `%USERPROFILE%\bin\coderun.cmd` so `coderun` works from PowerShell and Command Prompt;
 - adds `%USERPROFILE%\bin` to the User PATH.
@@ -232,7 +248,7 @@ coderun --info
 coderun --check
 ```
 
-`--check` is the quickest way to see which language toolchains are available. Missing optional toolchains only affect the languages that need them.
+`--check` is the quickest way to see which language toolchains are available. It is informational and exits `0`. Use `coderun --check <language>` to require one toolchain, or `coderun --check --strict` in CI to fail when anything is missing.
 
 ---
 
@@ -263,12 +279,20 @@ Common commands:
 
 ```bash
 coderun main.py                    # run an interpreted file
+coderun main.py --verbose          # pass --verbose to the program
+coderun main.cpp input.txt         # pass input.txt to the program
 coderun --compile main.cpp         # compile without running
 coderun -o app main.cpp            # compile to ./app and run it
 coderun --clean main.cpp           # remove the default artifact
 coderun --clean -o app main.cpp    # remove the custom and default artifacts
+coderun --runtime bun app.ts       # run TypeScript with Bun
+coderun --time main.py             # report elapsed time
 coderun --list                     # list supported languages
-coderun --check                    # check installed toolchains
+coderun --list --verbose           # show which toolchains are installed
+coderun --check                    # check installed toolchains (exit 0)
+coderun --check python             # require Python (exit 1 if missing)
+coderun --check --strict           # fail if any toolchain is missing
+coderun --completions bash         # print Bash completions
 ```
 
 ### Run any supported language
@@ -293,6 +317,13 @@ coderun script.pl       # Perl
 coderun analysis.jl     # Julia
 coderun main.dart       # Dart
 coderun script.exs      # Elixir
+coderun main.zig        # Zig
+coderun main.nim        # Nim
+coderun main.f90        # Fortran
+coderun main.pas        # Pascal
+coderun main.cr         # Crystal
+coderun Program.cs      # C#
+coderun script.fsx      # F#
 ```
 
 ---
@@ -301,13 +332,20 @@ coderun script.exs      # Elixir
 
 | Command | Description |
 | --- | --- |
-| `coderun <file>` | Detect the language, compile if necessary, and run the file. |
+| `coderun <file> [args...]` | Detect the language, compile if necessary, run the file, and pass the remaining arguments to the program. |
 | `coderun --compile <file>` | Compile only; the program is not executed. |
 | `coderun --clean <file>` | Remove generated artifacts for the file. |
-| `coderun -o <name> <file>` | Compile to a custom artifact and run it. |
-| `coderun --output <name> <file>` | Long form of `-o`. |
+| `coderun -o <name> <file> [args...]` | Compile to a custom artifact, run it, and pass the remaining arguments to the program. |
+| `coderun --output <name> <file> [args...]` | Long form of `-o`. |
+| `coderun --runtime <name> <file> [args...]` | Use `node`, `bun`, or `deno` for JavaScript/TypeScript. |
+| `coderun --time <file> [args...]` | Run or compile and report elapsed time on stderr. |
+| `coderun -q <file>`, `coderun --quiet <file>` | Suppress coderun's own informational messages. |
 | `coderun --list` | List supported languages, extensions, and types. |
-| `coderun --check` | Check required compilers and runtimes. |
+| `coderun --list --verbose` | List languages and whether their tools are installed. |
+| `coderun --check` | Check required compilers and runtimes (always exits `0`). |
+| `coderun --check <language>` | Check one toolchain; exits `1` if it is missing. |
+| `coderun --check --strict` | Check everything; exits `1` if any toolchain is missing. |
+| `coderun --completions <shell>` | Print completions for `bash`, `zsh`, `fish`, or `powershell`. |
 | `coderun --info` | Show version, install path, OS, architecture, and shell/PowerShell. |
 | `coderun --check-update` | Check for a newer release. |
 | `coderun --update` | Update the installed runner. |
@@ -317,11 +355,13 @@ coderun script.exs      # Elixir
 
 Notes:
 
-- `--compile` and `--clean` cannot be combined.
+- Everything after `<file>` is forwarded to the program unchanged. One immediate `--` separator after the file is dropped, so `coderun main.py -- --flag` passes `--flag`.
+- Use `coderun -- -file.py` when the filename itself begins with `-`.
+- `--compile` and `--clean` cannot be combined, and neither accepts program arguments.
 - `--compile` works for compiled languages. Interpreted languages return an unsupported-operation error.
-- `-o` / `--output` works for C, C++, Rust, Go, Swift, and Kotlin. It is not supported for Java or interpreted languages.
+- `-o` / `--output` works for C, C++, Rust, Go, Swift, Kotlin, Zig, Nim, Fortran, Pascal, and Crystal. It is not supported for Java or interpreted languages.
+- `--runtime` is only supported for JavaScript and TypeScript, and its value must be `node`, `bun`, or `deno`.
 - The output path must not be the source file itself.
-- On Linux and macOS, use `coderun -- <file>` if the filename begins with `-`.
 
 ### Help and version
 
@@ -336,12 +376,18 @@ coderun --version
 
 ```bash
 coderun --list
+coderun --list --verbose
 coderun --check
+coderun --check python
+coderun --check --strict
 coderun --info
 ```
 
-- `--list` prints all 19 languages with their extensions and whether they are compiled or interpreted.
-- `--check` verifies each required compiler/runtime and exits `1` if any are missing.
+- `--list` prints all 26 languages with their extensions and whether they are compiled or interpreted.
+- `--list --verbose` also prints whether each language's tools are installed.
+- `--check` prints every language's status and exits `0`, even when tools are missing.
+- `--check <language>` exits `1` when that language's tools are missing. It accepts names (`python`), IDs (`py`), extensions (`.py`), aliases (`golang`, `js`, `ts`, `cxx`), or tool names (`gcc` on Linux/Windows, `clang` on macOS, `node`).
+- `--check --strict` exits `1` when any toolchain is missing, which is useful in CI.
 - `--info` prints the version, install path, operating system, architecture, and shell (PowerShell version on Windows).
 
 ### Compile, clean, and custom output
@@ -351,9 +397,10 @@ coderun --compile main.cpp
 coderun --clean main.cpp
 coderun -o app main.cpp
 coderun --output build/app main.cpp
+coderun -o app main.cpp --port 8080
 ```
 
-`--compile` writes the artifact and reports the artifact location without running it. `--clean` removes artifacts. `-o` chooses a custom artifact name and runs the result in normal execution mode.
+`--compile` writes the artifact and reports the artifact location without running it. `--clean` removes artifacts. `-o` chooses a custom artifact name and runs the result in normal execution mode, forwarding any arguments after the source file.
 
 ---
 
@@ -370,7 +417,12 @@ coderun --output build/app main.cpp
 | Swift | none (`swift`) | none (`swift`) | `--compile` or `-o` creates `<name>` / `<name>.exe` |
 | Kotlin | `<name>.jar` | `<name>.jar` | Run with `java -jar` |
 | Java | `<name>.class` + inner classes with `--compile` | same | Default run uses `java File.java` |
-| Python, R, JavaScript, TypeScript, PHP, Ruby, Bash, Lua, Perl, Julia, Dart, Elixir | none | none | No build step |
+| Zig | none (`zig run`) | none (`zig run`) | `--compile` creates `<name>` / `<name>.exe` and `<name>.o` |
+| Nim | none (`nim r`) | none (`nim r`) | `--compile` or `-o` creates `<name>` / `<name>.exe` |
+| Fortran | `<name>` | `<name>.exe` | Beside the source file |
+| Pascal | `<name>` | `<name>.exe` | Beside the source file |
+| Crystal | none (`crystal run`) | none (`crystal run`) | `--compile` or `-o` creates `<name>` / `<name>.exe` |
+| Python, R, JavaScript, TypeScript, PHP, Ruby, Bash, Lua, Perl, Julia, Dart, Elixir, C#, F# | none | none | No build step |
 
 For example, `main.cpp` becomes `main` on Linux/macOS and `main.exe` on Windows.
 
@@ -383,7 +435,7 @@ coderun --output build/app main.cpp
 
 Rules:
 
-- Supported for C, C++, Rust, Go, Swift, and Kotlin.
+- Supported for C, C++, Rust, Go, Swift, Kotlin, Zig, Nim, Fortran, Pascal, and Crystal.
 - Not supported for Java or interpreted languages.
 - Relative paths are resolved from the current directory.
 - If the name already has an extension, it is used as-is.
@@ -404,6 +456,7 @@ coderun --clean -o app main.cpp
 
 - removes the default artifact for the source file, if present;
 - also removes the custom `-o` artifact when one is supplied;
+- removes Zig object files (`<name>.o`) alongside the binary;
 - removes Java class files matching the source name, including inner classes, in the source directory;
 - reports when an interpreted language has nothing to clean;
 - exits `0` when the clean completes, even if there was nothing to remove;
@@ -414,22 +467,25 @@ coderun --clean -o app main.cpp
 ## How it works
 
 ```text
-coderun main.cpp
+coderun main.cpp input.txt
       │
-      ├─ 1. Read the file extension (.cpp)
-      ├─ 2. Validate the mode and options
-      ├─ 3. Select the platform compiler (g++ / clang++ / g++)
-      ├─ 4. Compile to an artifact
-      ├─ 5. Run the artifact
-      └─ 6. Exit with the program's exit code
+      ├─ 1. Parse coderun options until the source file
+      ├─ 2. Read the file extension (.cpp)
+      ├─ 3. Treat everything after the file as program arguments
+      ├─ 4. Select the platform compiler (g++ / clang++ / g++)
+      ├─ 5. Compile to an artifact
+      ├─ 6. Run the artifact with the program arguments
+      └─ 7. Exit with the program's exit code
 ```
 
-For interpreted files, steps 4 and 5 become a single interpreter call:
+For interpreted files, compilation becomes a single interpreter call:
 
 ```text
-coderun app.py
-      └─ python3 app.py → exit with the program's exit code
+coderun app.py --verbose
+      └─ python3 app.py --verbose → exit with the program's exit code
 ```
+
+Coderun's own options are only recognized before the source file. After the file, `--list`, `--quiet`, and every other flag belong to the program. A single `--` immediately after the file is treated as a separator and is not passed on.
 
 ### Compiler selection
 
@@ -449,9 +505,9 @@ The other runtimes use the same tool names on every platform, except Python: `py
 
 | Platform | Requirements |
 | --- | --- |
-| Linux | Bash; `curl` or `wget` for `--update` and `--check-update` |
-| macOS | Bash; `curl` or `wget` for `--update` and `--check-update` |
-| Windows | PowerShell (`--update` and `--check-update` use the built-in `Invoke-WebRequest`) |
+| Linux | Bash; `curl` or `wget` plus `sha256sum` or `shasum` for `--update` and `--check-update` |
+| macOS | Bash 3.2 or newer; `curl` or `wget` plus `shasum` for `--update` and `--check-update` |
+| Windows | PowerShell (`--update` and `--check-update` use the built-in `Invoke-WebRequest` and `Get-FileHash`) |
 
 No language toolchain is bundled with `coderun`. Install the tools for the languages you use and make sure they are on PATH. The [Supported languages](#supported-languages) table lists the exact tool names.
 
@@ -467,8 +523,10 @@ No language toolchain is bundled with `coderun`. Install the tools for the langu
 | `java` | Running Java and Kotlin JARs | https://adoptium.net/ (Java 11+) |
 | `javac` | Compiling `.java` files with `--compile` | Included with the JDK |
 | `rustc` | Rust | https://rustup.rs/ |
-| `node` | JavaScript | https://nodejs.org/ |
-| `tsx` | TypeScript | `npm install -g tsx` |
+| `node` | JavaScript and TypeScript | https://nodejs.org/ |
+| `tsx` | TypeScript (default runtime) | `npm install -g tsx` |
+| `bun` | JavaScript and TypeScript via `--runtime bun` | https://bun.sh/ |
+| `deno` | JavaScript and TypeScript via `--runtime deno` | https://deno.com/ |
 | `go` | Go | https://go.dev/dl/ |
 | `php` | PHP | https://www.php.net/downloads |
 | `ruby` | Ruby | https://www.ruby-lang.org/en/downloads/ |
@@ -480,8 +538,16 @@ No language toolchain is bundled with `coderun`. Install the tools for the langu
 | `julia` | Julia | https://julialang.org/downloads/ |
 | `dart` | Dart | https://dart.dev/get-dart |
 | `elixir` | Elixir | https://elixir-lang.org/install.html |
+| `zig` | Zig | https://ziglang.org/download/ |
+| `nim` | Nim | https://nim-lang.org/install.html |
+| `gfortran` | Fortran | GCC's Fortran front end; on Ubuntu/Debian: `sudo apt install gfortran` |
+| `fpc` | Pascal | https://www.freepascal.org/download.html |
+| `crystal` | Crystal | https://crystal-lang.org/install/ |
+| `dotnet` | C# and F# | https://dotnet.microsoft.com/download (C# file-based apps require .NET 10+) |
 
 </details>
+
+Use `coderun --check <language>` to verify one toolchain, or `coderun --check --strict` to require every toolchain (for example in CI).
 
 ---
 
@@ -533,7 +599,7 @@ Confirm the upgrade:
 
 ```bash
 coderun --version
-# coderun 2.3.1
+# coderun 2.4.0
 ```
 
 The installers replace the existing runner file and keep the existing PATH entry. On Linux/macOS, use `which -a coderun` to check for an older copy earlier in PATH; on Windows, use `Get-Command coderun -All`.
@@ -560,15 +626,24 @@ coderun --update
 `--update` checks the published version before downloading anything:
 
 - If the installed version is current, it reports `coderun is up to date (<version>).` and exits `0` without replacing the installed runner.
-- If a newer version is available, it downloads the platform-specific runner, replaces the installed copy, and reports the new version.
+- If a newer version is available, it downloads the platform-specific runner, verifies it, replaces the installed copy atomically, and reports the new version.
 
 `--update` requires V2.1.0 or newer; older versions must upgrade once using the installer or a manual download. See [Upgrading from V1.0.0 or V2.0.0](#upgrading-from-v100-or-v200).
 
-- Linux/macOS: requires `curl` or `wget`.
-- Windows: uses PowerShell's `Invoke-WebRequest`.
+- Linux/macOS: requires `curl` or `wget` and `sha256sum` or `shasum`.
+- Windows: uses PowerShell's `Invoke-WebRequest` and `Get-FileHash`.
 - The runner must already be installed in the standard location.
-- Downloads are validated before replacing the existing runner.
-- A failed version check or download leaves the installed runner unchanged.
+- Downloads come from the versioned tag (`/v<version>/...`), not from `main`.
+- The downloaded runner must have the expected first line (`#!/usr/bin/env bash` on Linux/macOS, `param(` on Windows) and a `CODERUN_VERSION` matching the announced release.
+- `SHA256SUMS` from the same tag is verified before the installed runner is replaced.
+- Replacement uses a temporary file and an atomic move. A failed version check, download, version check, or checksum leaves the installed runner unchanged.
+- V2.3.1 installs can update to V2.4.0 with their existing updater; the 2.3.1 updater still uses the compatible `/main/` URL and shebang check.
+
+`CODERUN_RAW_BASE` overrides the raw GitHub base URL for mirrors and automated tests:
+
+```bash
+CODERUN_RAW_BASE=https://mirror.example.com/coderun coderun --update
+```
 
 ### Uninstall
 
@@ -596,10 +671,14 @@ Open a new terminal after uninstalling.
 
 Specific cases:
 
-- `coderun --check`: `1` if any required dependency is missing.
+- `coderun --check`: always `0` for a completed informational check.
+- `coderun --check <language>`: `1` if that language's tools are missing or the language is unknown.
+- `coderun --check --strict`: `1` if any toolchain is missing.
 - `coderun --check-update`: `1` if a newer release exists or the check fails.
+- `coderun --update`: `1` on a failed version check, download, version check, or checksum verification.
 - `coderun --compile`: the compiler's exit code on failure, `0` on success.
 - `coderun <file>`: the compiler's exit code if compilation fails, otherwise the program's exit code.
+- Program arguments do not change exit-code behavior; the program's code is still passed through.
 
 ---
 
@@ -608,31 +687,60 @@ Specific cases:
 ```text
 coderun/
 ├── bin/
-│   ├── coderun          # Linux runner
-│   └── coderun-mac      # macOS runner
+│   ├── coderun          # Linux/macOS runner (source of truth)
+│   └── coderun-mac      # Generated macOS copy
 ├── windows/
 │   └── coderun.ps1      # Windows runner
+├── scripts/
+│   ├── sync.sh          # Regenerate coderun-mac and root coderun
+│   ├── checksums.sh     # Generate SHA256SUMS
+│   ├── check.sh         # Version, syntax, mode, and hash checks
+│   └── release.sh       # Version bump, tag, and GitHub release
+├── tests/
+│   ├── run-bash-tests.sh
+│   ├── update-bash-tests.sh
+│   ├── installer-tests.sh
+│   ├── run-powershell-tests.ps1
+│   ├── installer-tests.ps1
+│   └── fake-tool.sh
+├── .github/
+│   ├── workflows/ci.yml
+│   └── PSScriptAnalyzerSettings.psd1
 ├── install.sh           # Linux installer
 ├── install-mac.sh       # macOS installer
 ├── install.ps1          # Windows installer
 ├── install.cmd          # Command Prompt wrapper for install.ps1
 ├── coderun              # Legacy root copy of the Linux runner
-├── VERSION              # Release version (2.3.1)
+├── VERSION              # Release version (2.4.0)
+├── SHA256SUMS           # Checksums for release files
 ├── README.md
 └── LICENSE
 ```
 
 | Path | Purpose |
 | --- | --- |
-| `bin/coderun` | Bash runner for Linux |
-| `bin/coderun-mac` | Bash runner for macOS |
+| `bin/coderun` | Unified Bash runner for Linux and macOS |
+| `bin/coderun-mac` | Generated copy for macOS, kept for compatibility |
 | `windows/coderun.ps1` | PowerShell runner for Windows |
-| `install.sh` | Installs the Linux runner to `~/.local/bin` |
-| `install-mac.sh` | Installs the macOS runner to `~/.local/bin` |
-| `install.ps1` | Installs the Windows runner to `%USERPROFILE%\bin` |
+| `scripts/sync.sh` | Regenerates `bin/coderun-mac` and legacy root `coderun` from `bin/coderun` |
+| `scripts/checksums.sh` | Regenerates `SHA256SUMS` |
+| `scripts/check.sh` | Verifies version consistency, file modes, syntax, and checksums |
+| `scripts/release.sh` | Bumps versions, syncs runners, tags, pushes, and creates a GitHub release |
+| `tests/run-bash-tests.sh` | Unix behavior tests (languages, arguments, flags, output) |
+| `tests/update-bash-tests.sh` | Unix update and checksum tests against a local HTTP server |
+| `tests/installer-tests.sh` | Unix installer tests with temporary `HOME` values |
+| `tests/run-powershell-tests.ps1` | Windows behavior and update tests |
+| `tests/installer-tests.ps1` | Windows installer tests with temporary `USERPROFILE` values |
+| `tests/fake-tool.sh` | Fake toolchain shim used by Unix tests |
+| `.github/workflows/ci.yml` | Linux, macOS, and Windows CI matrix |
+| `.github/PSScriptAnalyzerSettings.psd1` | PSScriptAnalyzer rules for the Windows runner |
+| `install.sh` | Installs the runner to `~/.local/bin` on Linux |
+| `install-mac.sh` | Installs the runner to `~/.local/bin` on macOS |
+| `install.ps1` | Installs the runner to `%USERPROFILE%\bin` on Windows |
 | `install.cmd` | Command Prompt wrapper for `install.ps1` |
-| `coderun` | Legacy copy of the Linux runner |
+| `coderun` | Legacy copy of the Linux runner, kept for compatibility |
 | `VERSION` | Single tracked release version, mirrored in the runners |
+| `SHA256SUMS` | Release checksums verified by `--update` |
 | `README.md` | Project documentation |
 | `LICENSE` | MIT license |
 
@@ -643,16 +751,20 @@ coderun/
 | Problem | Fix |
 | --- | --- |
 | `coderun: command not found` | Open a new terminal. Confirm `~/.local/bin` (Linux/macOS) or `%USERPROFILE%\bin` (Windows) is on PATH. |
-| Installer reports `gcc`/`g++` missing | Install a C/C++ toolchain. On Ubuntu/Debian: `sudo apt install build-essential`. On Windows: MinGW-w64 or MSYS2. |
-| Installer reports `clang` missing on macOS | Run `xcode-select --install`. |
-| `--check` reports missing tools | Install the toolchain for the language you need, or ignore languages you do not use. |
-| `tsx` not found | Install Node.js, then run `npm install -g tsx`. |
+| Installer warns that `gcc`/`g++` is missing | The install still succeeded. Install a C/C++ toolchain when you need C or C++. On Ubuntu/Debian: `sudo apt install build-essential`. On Windows: MinGW-w64 or MSYS2. |
+| Installer warns that `clang` is missing on macOS | The install still succeeded. Run `xcode-select --install` when you need C or C++. |
+| `--check` reports missing tools | Install the toolchain for the language you need, or ignore languages you do not use. Use `--check --strict` in CI. |
+| `tsx` not found | Install Node.js, then run `npm install -g tsx`. Or use `--runtime node`, `--runtime bun`, or `--runtime deno` when supported. |
+| Zig, Nim, Fortran, Pascal, or Crystal is not found | Install the matching toolchain and ensure it is on PATH. See [Requirements and toolchains](#requirements-and-toolchains). |
+| C# file-based app does not run | Install the .NET 10 SDK or newer and make sure `dotnet` is on PATH. |
 | A `.java` file does not run | Use Java 11 or newer for source-file execution. Check with `java -version`. |
 | Kotlin does not run | Ensure both `kotlinc` and `java` are on PATH. |
 | `bash` not found on Windows | Install Git Bash, WSL, or MSYS2 and add `bash` to PATH. |
 | PowerShell blocks `install.ps1` | Run `powershell -ExecutionPolicy Bypass -File .\install.ps1`. |
 | `--check-update` exits `1` | `1` means a newer release is available or the check failed. Read the message. |
-| `--update` fails | Check your network connection and, on Linux/macOS, that `curl` or `wget` is installed. |
+| `--update` fails | Check your network connection and, on Linux/macOS, that `curl` or `wget` and `sha256sum` or `shasum` are installed. |
+| `update checksum verification failed` | The download did not match the published `SHA256SUMS`. Nothing was replaced; retry the update. If it persists, report the release. |
+| Program flags are rejected before the file | Put coderun options before the source file. Everything after `<file>` is forwarded to the program. |
 | Permission denied running an installer | Run `chmod +x install.sh` or `chmod +x install-mac.sh`. |
 | Custom output path is missing | Create the parent directory before compiling, for example `mkdir -p build`. |
 
@@ -670,18 +782,24 @@ coderun/
 
 The release version is tracked in [`VERSION`](VERSION) and mirrored in the Linux, macOS, and Windows runners. `coderun --version` prints the installed runner's version.
 
-### Current release: V2.3.1
+### Current release: V2.4.0
 
-V2.3.1 makes `--update` version-aware and adds a Command Prompt installer:
+V2.4.0 is the largest release since the project moved to a multi-language runner:
 
-- Running `coderun --update` now checks the published `VERSION` before downloading.
-- When the installed version is current, it prints `coderun is up to date (2.3.1).` and exits `0` without replacing the runner.
-- When a newer release exists, it downloads it and prints `coderun updated successfully to <version>.`
-- A failed version check or download exits `1` and leaves the installed runner untouched.
-- Added `install.cmd`, which runs `install.ps1` from Command Prompt with the execution policy bypassed.
-- `--check-update` and all language behavior are unchanged.
+- **Program arguments are forwarded.** `coderun main.py --verbose` and `coderun main.cpp input.txt` now work. Everything after the source file belongs to the program; `--compile`, `--clean`, `-o`, and coderun's other options only apply before the file.
+- **Seven new languages:** Zig, Nim, Fortran, Pascal, Crystal, C# (file-based apps), and F# scripts. The total is now 26 languages: 12 compiled and 14 interpreted.
+- **Runtime selection:** `--runtime node|bun|deno` for JavaScript and TypeScript.
+- **Friendlier checks:** `--check` is informational and exits `0`; `--check <language>` requires one toolchain; `--check --strict` fails when anything is missing.
+- **Installers are decoupled:** `install.sh`, `install-mac.sh`, and `install.ps1` install the runner unconditionally and warn about missing baseline tools.
+- **Verbose listing:** `--list --verbose` shows whether each language's tools are installed.
+- **Shell completions:** `--completions bash|zsh|fish|powershell`.
+- **Output controls:** `--time` reports elapsed time on stderr; `-q` / `--quiet` suppresses coderun's own messages.
+- **Hardened updates:** downloads come from the versioned tag, the runner's embedded version must match the announced release, `SHA256SUMS` is verified, and replacement stays atomic.
+- **One Unix runner:** Linux and macOS now share `bin/coderun`; `bin/coderun-mac` and the legacy root `coderun` are generated copies kept for compatibility.
+- **Table-driven language metadata:** adding a language no longer requires editing a dozen dispatch blocks in each runner.
+- **Real tests and CI:** Unix and Windows suites cover every language with fake toolchains, update security cases, and installer behavior. CI runs on Ubuntu, macOS, and Windows, including PowerShell 7 and Windows PowerShell 5.1.
 
-V2.3.0 added Lua, Perl, Julia, Dart, and Elixir; see the release history below.
+V2.3.1 made `--update` version-aware and added `install.cmd`. V2.3.0 added Lua, Perl, Julia, Dart, and Elixir; see the release history below.
 
 ### Release history
 
@@ -693,6 +811,14 @@ V2.3.0 added Lua, Perl, Julia, Dart, and Elixir; see the release history below.
 | V2.2.0 | [v2.2.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.2.0) | Added list, check, info, check-update, compile, clean, and output options |
 | V2.3.0 | [v2.3.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.0) | Added Lua, Perl, Julia, Dart, and Elixir |
 | V2.3.1 | [v2.3.1](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.1) | Made `--update` version-aware and added a Command Prompt installer |
+| V2.4.0 | [v2.4.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.4.0) | Argument forwarding, 7 new languages, runtime selection, verified updates, unified Unix runner, and CI |
+
+### Release process
+
+1. Update `README.md` and run `scripts/check.sh`.
+2. Run the Unix and PowerShell test suites.
+3. Use `scripts/release.sh <version> --notes <file>` to bump the versions, sync the Unix copies, regenerate `SHA256SUMS`, commit, tag, push, and create the GitHub release.
+4. CI verifies the release on Ubuntu, macOS, and Windows.
 
 ---
 
@@ -700,16 +826,32 @@ V2.3.0 added Lua, Perl, Julia, Dart, and Elixir; see the release history below.
 
 1. Fork the repository.
 2. Create a branch for your change.
-3. Update the relevant runner:
-   - Linux: `bin/coderun`
-   - macOS: `bin/coderun-mac`
-   - Windows: `windows/coderun.ps1`
-4. If you change the Linux runner, keep the legacy root `coderun` copy in sync.
-5. Keep the version constant in each runner in sync with `VERSION`.
-6. Test the behavior you changed, including exit codes and paths with spaces.
-7. Open a pull request describing the change and the platform you tested.
+3. For Linux/macOS behavior, edit `bin/coderun` only, then run `./scripts/sync.sh` to regenerate `bin/coderun-mac` and the legacy root `coderun`.
+4. For Windows behavior, edit `windows/coderun.ps1`.
+5. Keep the runner versions and `VERSION` in sync, then run `./scripts/check.sh`.
+6. Run the relevant tests:
 
-There is no build step: the shell and PowerShell scripts are the product.
+   ```bash
+   ./tests/run-bash-tests.sh
+   ./tests/update-bash-tests.sh
+   ./tests/installer-tests.sh
+   pwsh -NoProfile -File tests/run-powershell-tests.ps1
+   pwsh -NoProfile -File tests/installer-tests.ps1
+   ```
+
+   On Linux, `CODERUN_TEST_OS=Darwin ./tests/run-bash-tests.sh` simulates the macOS compiler selection.
+
+7. Run ShellCheck on the Unix scripts and PSScriptAnalyzer on the Windows runner if they are available:
+
+   ```bash
+   shellcheck -S warning bin/coderun install.sh install-mac.sh scripts/*.sh tests/*.sh
+   ```
+
+8. Add or update tests for behavior changes, including argument forwarding, exit codes, and paths with spaces.
+9. Regenerate `SHA256SUMS` with `./scripts/checksums.sh` before committing release files.
+10. Open a pull request describing the change and the platform you tested.
+
+There is no build step: the shell and PowerShell scripts are the product. GitHub Actions runs the same checks on Ubuntu, macOS, and Windows.
 
 ---
 
