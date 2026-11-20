@@ -6,7 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE="$SCRIPT_DIR/bin/coderun-mac"
 INSTALL_DIR="$HOME/.local/bin"
 
-echo "Installing coderun for macOS..."
+if [ -f "$INSTALL_DIR/coderun" ]; then
+    echo "Existing installation found - upgrading..."
+else
+    echo "Installing coderun for macOS..."
+fi
 
 if ! command -v clang >/dev/null 2>&1; then
     echo "Error: clang is not installed."

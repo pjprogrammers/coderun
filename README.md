@@ -466,6 +466,57 @@ No language toolchain is bundled with `coderun`. Install the tools for the langu
 
 ## Update and uninstall
 
+### Upgrading from V1.0.0 or V2.0.0
+
+`--version` and `--update` were introduced in V2.1.0. Earlier versions do not parse flags at all, so `coderun --update` is treated as a filename and fails with `Error: file not found: --update`.
+
+Upgrade once manually, then use `coderun --update` for every later release.
+
+**If the repository clone still exists:**
+
+```bash
+cd coderun
+git pull
+./install.sh        # Linux
+./install-mac.sh    # macOS
+```
+
+```powershell
+cd coderun
+git pull
+.\install.ps1       # Windows
+```
+
+**If the clone is gone,** download the current runner directly:
+
+```bash
+# Linux
+curl -fsSL https://raw.githubusercontent.com/pjprogrammers/coderun/main/bin/coderun \
+  -o ~/.local/bin/coderun
+chmod +x ~/.local/bin/coderun
+
+# macOS
+curl -fsSL https://raw.githubusercontent.com/pjprogrammers/coderun/main/bin/coderun-mac \
+  -o ~/.local/bin/coderun
+chmod +x ~/.local/bin/coderun
+```
+
+```powershell
+# Windows
+Invoke-WebRequest `
+  -Uri https://raw.githubusercontent.com/pjprogrammers/coderun/main/windows/coderun.ps1 `
+  -OutFile "$env:USERPROFILE\bin\coderun.ps1"
+```
+
+Confirm the upgrade:
+
+```bash
+coderun --version
+# coderun 2.2.0
+```
+
+The installers replace the existing runner file and keep the existing PATH entry. On Linux/macOS, use `which -a coderun` to check for an older copy earlier in PATH; on Windows, use `Get-Command coderun -All`.
+
 ### Check for updates
 
 ```bash
@@ -486,6 +537,8 @@ coderun --update
 ```
 
 `--update` downloads the platform-specific runner from the project repository and replaces the installed copy.
+
+`--update` requires V2.1.0 or newer; older versions must upgrade once using the installer or a manual download. See [Upgrading from V1.0.0 or V2.0.0](#upgrading-from-v100-or-v200).
 
 - Linux/macOS: requires `curl` or `wget`.
 - Windows: uses PowerShell's `Invoke-WebRequest`.

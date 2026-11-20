@@ -7,7 +7,11 @@ $InstallDir = Join-Path $env:USERPROFILE "bin"
 $Target = Join-Path $InstallDir "coderun.ps1"
 $Launcher = Join-Path $InstallDir "coderun.cmd"
 
-Write-Host "Installing coderun for Windows..."
+if (Test-Path -LiteralPath $Target -PathType Leaf) {
+    Write-Host "Existing installation found - upgrading..."
+} else {
+    Write-Host "Installing coderun for Windows..."
+}
 Write-Host ""
 
 if (-not (Get-Command g++ -ErrorAction SilentlyContinue)) {

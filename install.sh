@@ -7,7 +7,11 @@ SOURCE="$SCRIPT_DIR/bin/coderun"
 INSTALL_DIR="$HOME/.local/bin"
 BASHRC="$HOME/.bashrc"
 
-echo "Installing coderun for Linux..."
+if [ -f "$INSTALL_DIR/coderun" ]; then
+    echo "Existing installation found - upgrading..."
+else
+    echo "Installing coderun for Linux..."
+fi
 
 if ! command -v gcc >/dev/null 2>&1; then
     echo "Error: gcc is not installed."
