@@ -10,9 +10,9 @@ coderun main.c
 coderun main.py
 ```
 
-**Version:** V2.1.0
+**Version:** V2.2.0
 
-**Previous Version:** V2.0.0
+**Previous Version:** V2.1.0
 
 ---
 
@@ -21,6 +21,12 @@ coderun main.py
 - Simple `coderun <file>` command
 - Help flags: `coderun -h` and `coderun --help`
 - Version check with `coderun -v` and `coderun --version`
+- Language listing with `coderun --list`
+- Dependency checks with `coderun --check`
+- Installation details with `coderun --info`
+- Update checks with `coderun --check-update`
+- Compile-only and clean modes with `coderun --compile` and `coderun --clean`
+- Custom artifact names with `coderun -o` and `coderun --output`
 - Self-update with `coderun --update`
 - Clean removal with `coderun --uninstall`
 - Supports C, C++, Python, R, Java, Rust, JavaScript, TypeScript, Go, PHP, Ruby, Bash, Swift and Kotlin
@@ -198,6 +204,64 @@ coderun --version
 ```
 
 Displays the installed version.
+
+### List Supported Languages
+
+```bash
+coderun --list
+```
+
+Lists all 14 supported languages with their extensions and whether they are compiled or interpreted.
+
+### Check Dependencies
+
+```bash
+coderun --check
+```
+
+Checks whether the required compilers and runtimes are installed and on PATH. It exits with `0` when every dependency is available and `1` when one or more are missing.
+
+### System Information
+
+```bash
+coderun --info
+```
+
+Displays the installed version, runner path, operating system, architecture and shell.
+
+### Check for Updates
+
+```bash
+coderun --check-update
+```
+
+Downloads the published `VERSION` file and compares it with the installed version without changing anything. It exits with `1` when a newer version is available and `0` when the installed version is current or newer.
+
+### Compile Without Running
+
+```bash
+coderun --compile main.cpp
+```
+
+Compiles a source file and reports the generated artifact without executing it. This is available for C, C++, Java, Rust, Go, Swift and Kotlin. Interpreted languages return a clear unsupported-operation error.
+
+### Custom Output
+
+```bash
+coderun -o app main.cpp
+coderun --output build/program main.cpp
+```
+
+Sets the output artifact for compiled languages. On Windows, `.exe` is appended when the output name has no extension. Kotlin appends `.jar` when no extension is supplied. `-o` is available for C, C++, Rust, Go, Swift and Kotlin; it is not supported for Java.
+
+### Clean Build Artifacts
+
+```bash
+coderun --clean main.cpp
+coderun --clean -o app main.cpp
+```
+
+Removes the generated executable, jar or Java class files for the given source file. Interpreted languages report that they have no build artifacts.
 
 ### Update
 
@@ -555,6 +619,21 @@ One command handles the rest.
 
 The current version is recorded in the [`VERSION`](VERSION) file and is available at runtime with `coderun --version`.
 
+### V2.2.0 — Information and Build Commands
+
+**Release type:** Minor feature release
+
+**Highlights:**
+
+- Added `--list` to display all supported languages and file types.
+- Added `--check` to verify required compilers and runtimes, with a nonzero exit code when dependencies are missing.
+- Added `--info` to display the version, install path, operating system, architecture and shell.
+- Added `--check-update` to compare the installed version with the published version.
+- Added `--compile` to compile without executing; interpreted languages report an unsupported operation.
+- Added `--clean` to remove generated executables, jars and Java class files.
+- Added `-o` and `--output` for custom compiled artifact names.
+- Preserved compiler and program exit codes across all platforms.
+
 ### V2.1.0 — Command-Line Options
 
 **Release type:** Minor feature release
@@ -598,6 +677,7 @@ Versions use the `MAJOR.MINOR.PATCH` format:
 | V1.0.0 | Initial release with C, C++ and Python support |
 | V2.0.0 | Expanded language support and multi-language execution |
 | V2.1.0 | Added help, version, update and uninstall flags |
+| V2.2.0 | Added language, dependency, system, update-check, compile, clean and output options |
 
 ### Current Supported File Types
 

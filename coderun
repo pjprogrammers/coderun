@@ -1,25 +1,58 @@
 #!/usr/bin/env bash
 
 # Keep in sync with the VERSION file.
-CODERUN_VERSION="2.1.0"
+CODERUN_VERSION="2.2.0"
 
 UPDATE_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/bin/coderun"
+VERSION_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/VERSION"
 INSTALL_DIR="$HOME/.local/bin"
-BASH_CONFIG="$HOME/.bashrc"
+
+# Platform-specific settings.
+CONFIG_FILES=("$HOME/.bashrc")
+SED_INPLACE=(-i)
+C_COMPILER="gcc"
+CPP_COMPILER="g++"
+
+TEMP_FILE=""
+
+cleanup_temp() {
+    if [ -n "$TEMP_FILE" ]; then
+        rm -f "$TEMP_FILE"
+    fi
+}
+
+trap cleanup_temp EXIT
 
 show_help() {
     echo "coderun $CODERUN_VERSION"
     echo
     cat <<'EOF'
-Usage: coderun <file>
+Usage:
+  coderun <file>
+  coderun --compile <file>
+  coderun --clean <file>
+  coderun -o <output> <file>
 
 Run source files in 14 languages with one command.
 
-Options:
-  -h, --help       Show this help message
-  -v, --version    Show the installed version
-  --update         Update coderun to the latest version
-  --uninstall      Remove coderun from this system
+Help:
+  -h, --help           Show this help message
+  -v, --version        Show the installed version
+
+Information:
+      --list           List supported languages
+      --check          Check required compilers and runtimes
+      --info           Show system and installation information
+      --check-update   Check for a newer coderun release
+
+Maintenance:
+      --update         Update coderun to the latest version
+      --uninstall      Remove coderun from this system
+
+Execution:
+      --compile        Compile without running
+      --clean          Remove generated build artifacts
+  -o, --output <file>  Set the output artifact for compiled languages
 
 Supported languages:
   C (.c), C++ (.cpp), Python (.py), R (.R, .r), Java (.java),
@@ -29,15 +62,215 @@ Supported languages:
 Examples:
   coderun main.cpp
   coderun main.py
-  coderun Main.java
+  coderun --compile main.cpp
+  coderun -o app main.cpp
+  coderun --clean main.cpp
 
 Note: The required compiler or runtime must be installed and on PATH.
 EOF
 }
 
+show_languages() {
+    echo "Supported languages:"
+    echo
+    printf '  %-12s %-14s %s\n' "Language" "Extensions" "Type"
+    printf '  %-12s %-14s %s\n' "C" ".c" "compiled"
+    printf '  %-12s %-14s %s\n' "C++" ".cpp" "compiled"
+    printf '  %-12s %-14s %s\n' "Python" ".py" "interpreted"
+    printf '  %-12s %-14s %s\n' "R" ".r, .R" "interpreted"
+    printf '  %-12s %-14s %s\n' "Java" ".java" "compiled"
+    printf '  %-12s %-14s %s\n' "Rust" ".rs" "compiled"
+    printf '  %-12s %-14s %s\n' "JavaScript" ".js" "interpreted"
+    printf '  %-12s %-14s %s\n' "TypeScript" ".ts" "interpreted"
+    printf '  %-12s %-14s %s\n' "Go" ".go" "compiled"
+    printf '  %-12s %-14s %s\n' "PHP" ".php" "interpreted"
+    printf '  %-12s %-14s %s\n' "Ruby" ".rb" "interpreted"
+    printf '  %-12s %-14s %s\n' "Bash" ".sh" "interpreted"
+    printf '  %-12s %-14s %s\n' "Swift" ".swift" "compiled"
+    printf '  %-12s %-14s %s\n' "Kotlin" ".kt" "compiled"
+}
+
+CHECK_FAILURES=0
+
+check_tool_group() {
+    local name="$1"
+    shift
+    local missing=""
+    local cmd
+
+    for cmd in "$@"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing="$missing $cmd"
+        fi
+    done
+
+    if [ -z "$missing" ]; then
+        printf '  %-13s ok\n' "$name"
+    else
+        printf '  %-13s missing:%s\n' "$name" "$missing"
+        CHECK_FAILURES=$((CHECK_FAILURES + 1))
+    fi
+}
+
+check_dependencies() {
+    echo "Checking required compilers and runtimes:"
+    echo
+
+    check_tool_group "C" "$C_COMPILER"
+    check_tool_group "C++" "$CPP_COMPILER"
+    check_tool_group "Python" python3
+    check_tool_group "R" Rscript
+    check_tool_group "Java" java javac
+    check_tool_group "Rust" rustc
+    check_tool_group "JavaScript" node
+    check_tool_group "TypeScript" tsx
+    check_tool_group "Go" go
+    check_tool_group "PHP" php
+    check_tool_group "Ruby" ruby
+    check_tool_group "Bash" bash
+    check_tool_group "Swift" swift swiftc
+    check_tool_group "Kotlin" kotlinc java
+
+    echo
+
+    if [ "$CHECK_FAILURES" -eq 0 ]; then
+        echo "All dependencies are available."
+        return 0
+    fi
+
+    echo "Some dependencies are missing. Install the missing tools and try again."
+    return 1
+}
+
+resolve_script_path() {
+    local source="${BASH_SOURCE[0]}"
+    local dir
+
+    case "$source" in
+        */*) ;;
+        *)
+            source="$(command -v -- "$source" 2>/dev/null || printf '%s' "$source")"
+            ;;
+    esac
+
+    while [ -L "$source" ]; do
+        dir="$(cd -P "$(dirname "$source")" >/dev/null 2>&1 && pwd)"
+        source="$(readlink "$source")"
+        case "$source" in
+            /*) ;;
+            *) source="$dir/$source" ;;
+        esac
+    done
+
+    dir="$(cd -P "$(dirname "$source")" >/dev/null 2>&1 && pwd)"
+    printf '%s/%s\n' "$dir" "$(basename "$source")"
+}
+
+show_info() {
+    local script_path
+    local os_name
+    local arch
+
+    script_path="$(resolve_script_path)"
+    os_name="$(uname -s 2>/dev/null || echo unknown)"
+    arch="$(uname -m 2>/dev/null || echo unknown)"
+
+    echo "coderun $CODERUN_VERSION"
+    echo "Install path: $script_path"
+    echo "Operating system: $os_name"
+    echo "Architecture: $arch"
+    echo "Shell: ${SHELL:-unknown}"
+}
+
+choose_downloader() {
+    if command -v curl >/dev/null 2>&1; then
+        echo "curl"
+    elif command -v wget >/dev/null 2>&1; then
+        echo "wget"
+    else
+        return 1
+    fi
+}
+
+download_file() {
+    local url="$1"
+    local destination="$2"
+    local downloader
+
+    downloader="$(choose_downloader)" || return 127
+
+    if [ "$downloader" = "curl" ]; then
+        curl -fsSL "$url" -o "$destination"
+    else
+        wget -qO "$destination" "$url"
+    fi
+}
+
+version_greater() {
+    local left="$1"
+    local right="$2"
+    local i
+    local -a left_parts
+    local -a right_parts
+
+    IFS='.' read -r -a left_parts <<< "$left"
+    IFS='.' read -r -a right_parts <<< "$right"
+
+    for i in 0 1 2; do
+        if [ "$((10#${left_parts[i]:-0}))" -gt "$((10#${right_parts[i]:-0}))" ]; then
+            return 0
+        fi
+        if [ "$((10#${left_parts[i]:-0}))" -lt "$((10#${right_parts[i]:-0}))" ]; then
+            return 1
+        fi
+    done
+
+    return 1
+}
+
+check_update() {
+    local latest
+    local status
+
+    echo "Current version: $CODERUN_VERSION"
+    echo "Checking for updates..."
+
+    TEMP_FILE="${TMPDIR:-/tmp}/coderun-version.$$"
+
+    download_file "$VERSION_URL" "$TEMP_FILE"
+    status=$?
+
+    if [ "$status" -eq 127 ]; then
+        echo "Error: curl or wget is required to check for updates."
+        exit 1
+    fi
+
+    if [ "$status" -ne 0 ]; then
+        echo "Error: could not check for updates."
+        exit 1
+    fi
+
+    latest="$(tr -d '[:space:]' < "$TEMP_FILE")"
+
+    if ! [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "Error: could not read the latest version."
+        exit 1
+    fi
+
+    echo "Latest version: $latest"
+
+    if version_greater "$latest" "$CODERUN_VERSION"; then
+        echo "A new version is available. Run 'coderun --update' to install it."
+        exit 1
+    fi
+
+    echo "coderun is up to date."
+    exit 0
+}
+
 update_coderun() {
     local target="$INSTALL_DIR/coderun"
-    local downloader
+    local status
 
     if [ ! -f "$target" ]; then
         echo "Error: coderun is not installed at $target."
@@ -45,42 +278,33 @@ update_coderun() {
         exit 1
     fi
 
-    if command -v curl >/dev/null 2>&1; then
-        downloader="curl"
-    elif command -v wget >/dev/null 2>&1; then
-        downloader="wget"
-    else
+    TEMP_FILE="$target.tmp.$$"
+
+    echo "Updating coderun..."
+
+    download_file "$UPDATE_URL" "$TEMP_FILE"
+    status=$?
+
+    if [ "$status" -eq 127 ]; then
         echo "Error: curl or wget is required to update coderun."
         exit 1
     fi
 
-    tmp="$target.tmp.$$"
-    trap 'rm -f "$tmp"' EXIT
-
-    echo "Updating coderun..."
-    if [ "$downloader" = "curl" ]; then
-        curl -fsSL "$UPDATE_URL" -o "$tmp" || {
-            echo "Error: update download failed."
-            exit 1
-        }
-    else
-        wget -qO "$tmp" "$UPDATE_URL" || {
-            echo "Error: update download failed."
-            exit 1
-        }
+    if [ "$status" -ne 0 ]; then
+        echo "Error: update download failed."
+        exit 1
     fi
 
-    if [ "$(head -n 1 "$tmp")" != "#!/usr/bin/env bash" ]; then
+    if [ "$(head -n 1 "$TEMP_FILE")" != "#!/usr/bin/env bash" ]; then
         echo "Error: downloaded file does not look like a valid coderun script."
         exit 1
     fi
 
-    if ! chmod 755 "$tmp" || ! mv "$tmp" "$target"; then
+    if ! chmod 755 "$TEMP_FILE" || ! mv "$TEMP_FILE" "$target"; then
         echo "Error: could not replace $target."
         exit 1
     fi
 
-    trap - EXIT
     echo "coderun updated successfully."
 }
 
@@ -88,6 +312,7 @@ uninstall_coderun() {
     local target="$INSTALL_DIR/coderun"
     local removed=0
     local install_dir_empty=0
+    local config
 
     if [ -f "$target" ]; then
         rm -f "$target"
@@ -104,10 +329,12 @@ uninstall_coderun() {
     fi
 
     if [ "$install_dir_empty" -eq 1 ]; then
-        if [ -f "$BASH_CONFIG" ] && grep -qF 'export PATH="$HOME/.local/bin:$PATH"' "$BASH_CONFIG"; then
-            sed -i '/^export PATH="\$HOME\/\.local\/bin:\$PATH"$/d' "$BASH_CONFIG"
-            echo "Removed coderun PATH entry from $BASH_CONFIG"
-        fi
+        for config in "${CONFIG_FILES[@]}"; do
+            if [ -f "$config" ] && grep -qF 'export PATH="$HOME/.local/bin:$PATH"' "$config"; then
+                sed "${SED_INPLACE[@]}" '/^export PATH="\$HOME\/\.local\/bin:\$PATH"$/d' "$config"
+                echo "Removed coderun PATH entry from $config"
+            fi
+        done
 
         rmdir "$INSTALL_DIR" 2>/dev/null || true
     else
@@ -122,36 +349,362 @@ uninstall_coderun() {
     fi
 }
 
-if [ $# -eq 0 ]; then
+is_supported() {
+    case "$ext" in
+        c|cpp|py|r|java|rs|js|ts|go|php|rb|sh|swift|kt)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_compiled() {
+    case "$ext" in
+        c|cpp|java|rs|go|swift|kt)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+compile_artifact() {
+    if [ -n "$output_opt" ]; then
+        case "$ext" in
+            kt)
+                case "$(basename "$output_opt")" in
+                    *.*)
+                        COMPILE_OUTPUT="$output_opt"
+                        ;;
+                    *)
+                        COMPILE_OUTPUT="$output_opt.jar"
+                        ;;
+                esac
+                ;;
+            *)
+                COMPILE_OUTPUT="$output_opt"
+                ;;
+        esac
+    else
+        case "$ext" in
+            c|cpp|rs|go|swift)
+                COMPILE_OUTPUT="$dir/$base"
+                ;;
+            kt)
+                COMPILE_OUTPUT="$dir/$base.jar"
+                ;;
+            java)
+                COMPILE_OUTPUT="$dir"
+                ;;
+        esac
+    fi
+}
+
+resolve_output_path() {
+    case "$1" in
+        /*)
+            printf '%s\n' "$1"
+            ;;
+        *)
+            printf '%s/%s\n' "$(pwd)" "$1"
+            ;;
+    esac
+}
+
+compile_file() {
+    compile_artifact
+
+    case "$ext" in
+        cpp)
+            "$CPP_COMPILER" "$file" -o "$COMPILE_OUTPUT"
+            return $?
+            ;;
+        c)
+            "$C_COMPILER" "$file" -o "$COMPILE_OUTPUT"
+            return $?
+            ;;
+        java)
+            javac "$file" -d "$dir"
+            return $?
+            ;;
+        rs)
+            rustc "$file" -o "$COMPILE_OUTPUT"
+            return $?
+            ;;
+        go)
+            go build -o "$COMPILE_OUTPUT" "$file"
+            return $?
+            ;;
+        swift)
+            swiftc "$file" -o "$COMPILE_OUTPUT"
+            return $?
+            ;;
+        kt)
+            kotlinc "$file" -include-runtime -d "$COMPILE_OUTPUT"
+            return $?
+            ;;
+    esac
+
+    return 1
+}
+
+run_file() {
+    local target
+
+    case "$ext" in
+        py)
+            python3 "$file"
+            return $?
+            ;;
+        r)
+            Rscript "$file"
+            return $?
+            ;;
+        js)
+            node "$file"
+            return $?
+            ;;
+        ts)
+            tsx "$file"
+            return $?
+            ;;
+        php)
+            php "$file"
+            return $?
+            ;;
+        rb)
+            ruby "$file"
+            return $?
+            ;;
+        sh)
+            bash "$file"
+            return $?
+            ;;
+        java)
+            java "$file"
+            return $?
+            ;;
+        cpp|c|rs|kt|go|swift)
+            if [ -n "$output_opt" ]; then
+                compile_file || return $?
+
+                if [ "$ext" = "kt" ]; then
+                    java -jar "$COMPILE_OUTPUT"
+                    return $?
+                fi
+
+                target="$(resolve_output_path "$COMPILE_OUTPUT")"
+                "$target"
+                return $?
+            fi
+
+            case "$ext" in
+                cpp|c|rs)
+                    compile_file || return $?
+                    target="$(resolve_output_path "$COMPILE_OUTPUT")"
+                    "$target"
+                    return $?
+                    ;;
+                kt)
+                    compile_file || return $?
+                    java -jar "$COMPILE_OUTPUT"
+                    return $?
+                    ;;
+                go)
+                    go run "$file"
+                    return $?
+                    ;;
+                swift)
+                    swift "$file"
+                    return $?
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+CLEANED=0
+CLEAN_FAILED=0
+
+remove_artifact() {
+    if [ -e "$1" ]; then
+        if rm -f "$1"; then
+            echo "Removed $1"
+            CLEANED=1
+        else
+            echo "Error: could not remove $1."
+            CLEAN_FAILED=1
+        fi
+    fi
+}
+
+clean_file() {
+    local class_file
+    local custom_artifact
+
+    case "$ext" in
+        py|r|js|ts|php|rb|sh)
+            echo "No build artifacts to clean for .$ext files (interpreted language)."
+            return 0
+            ;;
+    esac
+
+    if [ -n "$output_opt" ]; then
+        case "$ext" in
+            kt)
+                case "$(basename "$output_opt")" in
+                    *.*)
+                        custom_artifact="$output_opt"
+                        ;;
+                    *)
+                        custom_artifact="$output_opt.jar"
+                        ;;
+                esac
+                remove_artifact "$custom_artifact"
+                ;;
+            c|cpp|rs|go|swift)
+                remove_artifact "$output_opt"
+                ;;
+        esac
+    fi
+
+    case "$ext" in
+        c|cpp|rs|go|swift)
+            remove_artifact "$dir/$base"
+            ;;
+        kt)
+            remove_artifact "$dir/$base.jar"
+            ;;
+        java)
+            remove_artifact "$dir/$base.class"
+            for class_file in "$dir/$base"\$*.class; do
+                if [ -e "$class_file" ]; then
+                    remove_artifact "$class_file"
+                fi
+            done
+            ;;
+    esac
+
+    if [ "$CLEANED" -eq 0 ]; then
+        echo "No build artifacts found for $file."
+    fi
+
+    if [ "$CLEAN_FAILED" -ne 0 ]; then
+        return 1
+    fi
+
+    return 0
+}
+
+set_mode() {
+    if [ "$mode" != "run" ] && [ "$mode" != "$1" ]; then
+        echo "Error: --compile and --clean cannot be used together."
+        exit 1
+    fi
+    mode="$1"
+}
+
+mode="run"
+output_opt=""
+file=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -v|--version)
+            echo "coderun $CODERUN_VERSION"
+            exit 0
+            ;;
+        --list)
+            show_languages
+            exit 0
+            ;;
+        --check)
+            check_dependencies
+            exit $?
+            ;;
+        --info)
+            show_info
+            exit 0
+            ;;
+        --check-update)
+            check_update
+            exit $?
+            ;;
+        --update)
+            update_coderun
+            exit 0
+            ;;
+        --uninstall)
+            uninstall_coderun
+            exit 0
+            ;;
+        --compile)
+            set_mode "compile"
+            ;;
+        --clean)
+            set_mode "clean"
+            ;;
+        -o|--output)
+            if [ $# -lt 2 ] || [ -z "$2" ]; then
+                echo "Error: $1 requires an output path."
+                exit 1
+            fi
+            output_opt="$2"
+            shift
+            ;;
+        --)
+            shift
+            if [ -z "$file" ] && [ $# -gt 0 ]; then
+                file="$1"
+                shift
+            fi
+            if [ $# -gt 0 ]; then
+                echo "Error: unexpected argument: $1"
+                exit 1
+            fi
+            break
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            echo "Try 'coderun --help' for more information."
+            exit 1
+            ;;
+        *)
+            if [ -z "$file" ]; then
+                file="$1"
+            else
+                echo "Error: unexpected argument: $1"
+                exit 1
+            fi
+            ;;
+    esac
+
+    shift
+done
+
+if [ "$mode" = "compile" ] || [ "$mode" = "clean" ]; then
+    if [ -z "$file" ]; then
+        echo "Error: --$mode requires a source file."
+        exit 1
+    fi
+fi
+
+if [ -z "$file" ]; then
+    if [ -n "$output_opt" ]; then
+        echo "Error: -o/--output requires a source file."
+        exit 1
+    fi
+
     show_help
     exit 1
 fi
-
-case "$1" in
-    -h|--help)
-        show_help
-        exit 0
-        ;;
-    -v|--version)
-        echo "coderun $CODERUN_VERSION"
-        exit 0
-        ;;
-    --update)
-        update_coderun
-        exit 0
-        ;;
-    --uninstall)
-        uninstall_coderun
-        exit 0
-        ;;
-    -*)
-        echo "Unknown option: $1"
-        echo "Try 'coderun --help' for more information."
-        exit 1
-        ;;
-esac
-
-file="$1"
 
 if [ ! -f "$file" ]; then
     echo "Error: file not found: $file"
@@ -164,52 +717,59 @@ base="${name%.*}"
 ext="${name##*.}"
 ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
 
-case "$ext" in
-    cpp)
-        g++ "$file" -o "$dir/$base" && "$dir/$base"
-        ;;
-    c)
-        gcc "$file" -o "$dir/$base" && "$dir/$base"
-        ;;
-    py)
-        python3 "$file"
-        ;;
-    r)
-        Rscript "$file"
-        ;;
-    java)
-        java "$file"
-        ;;
-    rs)
-        rustc "$file" -o "$dir/$base" && "$dir/$base"
-        ;;
-    js)
-        node "$file"
-        ;;
-    ts)
-        tsx "$file"
-        ;;
-    go)
-        go run "$file"
-        ;;
-    php)
-        php "$file"
-        ;;
-    rb)
-        ruby "$file"
-        ;;
-    sh)
-        bash "$file"
-        ;;
-    swift)
-        swift "$file"
-        ;;
-    kt)
-        kotlinc "$file" -include-runtime -d "$dir/$base.jar" && java -jar "$dir/$base.jar"
-        ;;
-    *)
-        echo "Unsupported file type: .$ext"
-        echo "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt"
+if ! is_supported; then
+    echo "Unsupported file type: .$ext"
+    echo "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt"
+    exit 1
+fi
+
+if [ -n "$output_opt" ]; then
+    case "$ext" in
+        c|cpp|rs|go|swift|kt)
+            ;;
+        java)
+            echo "Error: -o/--output is not supported for Java."
+            exit 1
+            ;;
+        *)
+            echo "Error: -o/--output is only supported for compiled languages."
+            exit 1
+            ;;
+    esac
+
+    if [ "$output_opt" = "$file" ]; then
+        echo "Error: output path must not be the source file."
         exit 1
-        ;;
-esac
+    fi
+fi
+
+if [ "$mode" = "clean" ]; then
+    clean_file
+    exit $?
+fi
+
+if [ "$mode" = "compile" ]; then
+    if ! is_compiled; then
+        echo "Error: cannot compile .$ext files; this language is interpreted."
+        echo "Use 'coderun \"$file\"' to run it directly."
+        exit 1
+    fi
+
+    compile_file
+    status=$?
+
+    if [ "$status" -ne 0 ]; then
+        exit "$status"
+    fi
+
+    if [ "$ext" = "java" ]; then
+        echo "Compiled $file -> $dir (Java class files)"
+    else
+        echo "Compiled $file -> $COMPILE_OUTPUT"
+    fi
+
+    exit 0
+fi
+
+run_file
+exit $?
