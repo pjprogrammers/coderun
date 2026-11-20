@@ -1,9 +1,9 @@
 # coderun
 
-**Run 14 programming languages with one command — on Linux, macOS, and Windows.**
+**Run 19 programming languages with one command — on Linux, macOS, and Windows.**
 
 [![Latest release](https://img.shields.io/github/v/release/pjprogrammers/coderun?label=release)](https://github.com/pjprogrammers/coderun/releases/latest)
-[![Languages](https://img.shields.io/badge/languages-14-brightgreen)](#supported-languages)
+[![Languages](https://img.shields.io/badge/languages-19-brightgreen)](#supported-languages)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue)](#supported-platforms)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
@@ -57,10 +57,10 @@ Different languages usually mean different commands:
 
 ### Features
 
-- **14 languages** — 7 compiled and 7 interpreted.
+- **19 languages** — 7 compiled and 12 interpreted.
 - **3 platforms** — Linux, macOS, and Windows.
 - **Automatic compilation** for C, C++, Java, Rust, Go, Swift, and Kotlin.
-- **Direct execution** for Python, R, JavaScript, TypeScript, PHP, Ruby, and Bash.
+- **Direct execution** for Python, R, JavaScript, TypeScript, PHP, Ruby, Bash, Lua, Perl, Julia, Dart, and Elixir.
 - **Compile-only mode** with `--compile`.
 - **Artifact cleanup** with `--clean`, including Java inner classes.
 - **Custom output names** with `-o` / `--output`.
@@ -78,8 +78,8 @@ Different languages usually mean different commands:
 
 | | |
 | --- | --- |
-| **Current version** | 2.2.0 |
-| **Languages** | 14 — 7 compiled, 7 interpreted |
+| **Current version** | 2.3.0 |
+| **Languages** | 19 — 7 compiled, 12 interpreted |
 | **Operating systems** | 3 — Linux, macOS, Windows |
 | **Interface** | Command line |
 | **Runner runtime** | Bash (Linux/macOS), PowerShell (Windows) |
@@ -95,7 +95,7 @@ Different languages usually mean different commands:
 | macOS | `bin/coderun-mac` | `install-mac.sh` | `~/.local/bin/coderun` | `clang` / `clang++` |
 | Windows | `windows/coderun.ps1` | `install.ps1` | `%USERPROFILE%\bin\coderun.ps1` and `coderun.cmd` | `gcc` / `g++` |
 
-All three runners expose the same 14 languages and the same command-line options. The intentional platform differences are the C/C++ compiler choice and the shell integration.
+All three runners expose the same 19 languages and the same command-line options. The intentional platform differences are the C/C++ compiler choice and the shell integration.
 
 ---
 
@@ -117,8 +117,13 @@ All three runners expose the same 14 languages and the same command-line options
 | Bash | `.sh` | Interpreted | Run with `bash` | `bash` |
 | Swift | `.swift` | Compiled | `swift main.swift` (or `swiftc` with `--compile`) | `swift`, `swiftc` |
 | Kotlin | `.kt` | Compiled | Compile to a JAR, then run with `java -jar` | `kotlinc`, `java` |
+| Lua | `.lua` | Interpreted | Run directly | `lua` |
+| Perl | `.pl` | Interpreted | Run directly | `perl` |
+| Julia | `.jl` | Interpreted | Run directly | `julia` |
+| Dart | `.dart` | Interpreted | Run with `dart run` | `dart` |
+| Elixir | `.exs` | Interpreted | Run directly | `elixir` |
 
-Extensions are matched case-insensitively. Only the toolchains for the languages you actually use need to be installed.
+Extensions are matched case-insensitively. Only the toolchains for the languages you actually use need to be installed. `.pl` is treated as Perl, and `.exs` as an Elixir script.
 
 ---
 
@@ -277,6 +282,11 @@ coderun script.rb       # Ruby
 coderun script.sh       # Bash
 coderun main.swift      # Swift
 coderun Main.kt         # Kotlin
+coderun main.lua        # Lua
+coderun script.pl       # Perl
+coderun analysis.jl     # Julia
+coderun main.dart       # Dart
+coderun script.exs      # Elixir
 ```
 
 ---
@@ -324,7 +334,7 @@ coderun --check
 coderun --info
 ```
 
-- `--list` prints all 14 languages with their extensions and whether they are compiled or interpreted.
+- `--list` prints all 19 languages with their extensions and whether they are compiled or interpreted.
 - `--check` verifies each required compiler/runtime and exits `1` if any are missing.
 - `--info` prints the version, install path, operating system, architecture, and shell (PowerShell version on Windows).
 
@@ -354,7 +364,7 @@ coderun --output build/app main.cpp
 | Swift | none (`swift`) | none (`swift`) | `--compile` or `-o` creates `<name>` / `<name>.exe` |
 | Kotlin | `<name>.jar` | `<name>.jar` | Run with `java -jar` |
 | Java | `<name>.class` + inner classes with `--compile` | same | Default run uses `java File.java` |
-| Python, R, JavaScript, TypeScript, PHP, Ruby, Bash | none | none | No build step |
+| Python, R, JavaScript, TypeScript, PHP, Ruby, Bash, Lua, Perl, Julia, Dart, Elixir | none | none | No build step |
 
 For example, `main.cpp` becomes `main` on Linux/macOS and `main.exe` on Windows.
 
@@ -459,6 +469,11 @@ No language toolchain is bundled with `coderun`. Install the tools for the langu
 | `bash` | Bash | Built in on Linux/macOS; Git Bash, WSL, or MSYS2 on Windows |
 | `swift`, `swiftc` | Swift | https://www.swift.org/install/ |
 | `kotlinc` | Kotlin | https://kotlinlang.org/docs/command-line.html |
+| `lua` | Lua | https://www.lua.org/download.html |
+| `perl` | Perl | https://www.perl.org/get.html |
+| `julia` | Julia | https://julialang.org/downloads/ |
+| `dart` | Dart | https://dart.dev/get-dart |
+| `elixir` | Elixir | https://elixir-lang.org/install.html |
 
 </details>
 
@@ -512,7 +527,7 @@ Confirm the upgrade:
 
 ```bash
 coderun --version
-# coderun 2.2.0
+# coderun 2.3.0
 ```
 
 The installers replace the existing runner file and keep the existing PATH entry. On Linux/macOS, use `which -a coderun` to check for an older copy earlier in PATH; on Windows, use `Get-Command coderun -All`.
@@ -591,7 +606,7 @@ coderun/
 ├── install-mac.sh       # macOS installer
 ├── install.ps1          # Windows installer
 ├── coderun              # Legacy root copy of the Linux runner
-├── VERSION              # Release version (2.2.0)
+├── VERSION              # Release version (2.3.0)
 ├── README.md
 └── LICENSE
 ```
@@ -643,14 +658,17 @@ coderun/
 
 The release version is tracked in [`VERSION`](VERSION) and mirrored in the Linux, macOS, and Windows runners. `coderun --version` prints the installed runner's version.
 
-### Current release: V2.2.0
+### Current release: V2.3.0
 
-V2.2.0 adds the information and build commands:
+V2.3.0 adds five interpreted languages:
 
-- `--list`, `--check`, `--info`, and `--check-update`
-- `--compile` and `--clean`
-- `-o` / `--output`
-- Compiler and program exit-code preservation across all platforms
+- Lua (`.lua`)
+- Perl (`.pl`)
+- Julia (`.jl`)
+- Dart (`.dart`)
+- Elixir (`.exs`)
+
+All five run directly, so `--compile` reports that they are interpreted and `--clean` reports that there are no artifacts. Existing commands and exit-code behavior are unchanged.
 
 ### Release history
 
@@ -660,6 +678,7 @@ V2.2.0 adds the information and build commands:
 | V2.0.0 | [v2.0.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.0.0) | Expanded to 14 languages |
 | V2.1.0 | [v2.1.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.1.0) | Added help, version, update, and uninstall flags |
 | V2.2.0 | [v2.2.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.2.0) | Added list, check, info, check-update, compile, clean, and output options |
+| V2.3.0 | [v2.3.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.0) | Added Lua, Perl, Julia, Dart, and Elixir |
 
 ---
 

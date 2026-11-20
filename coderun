@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep in sync with the VERSION file.
-CODERUN_VERSION="2.2.0"
+CODERUN_VERSION="2.3.0"
 
 UPDATE_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/bin/coderun"
 VERSION_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/VERSION"
@@ -33,7 +33,7 @@ Usage:
   coderun --clean <file>
   coderun -o <output> <file>
 
-Run source files in 14 languages with one command.
+Run source files in 19 languages with one command.
 
 Help:
   -h, --help           Show this help message
@@ -57,7 +57,8 @@ Execution:
 Supported languages:
   C (.c), C++ (.cpp), Python (.py), R (.R, .r), Java (.java),
   Rust (.rs), JavaScript (.js), TypeScript (.ts), Go (.go), PHP (.php),
-  Ruby (.rb), Bash (.sh), Swift (.swift), Kotlin (.kt)
+  Ruby (.rb), Bash (.sh), Swift (.swift), Kotlin (.kt), Lua (.lua),
+  Perl (.pl), Julia (.jl), Dart (.dart), Elixir (.exs)
 
 Examples:
   coderun main.cpp
@@ -88,6 +89,11 @@ show_languages() {
     printf '  %-12s %-14s %s\n' "Bash" ".sh" "interpreted"
     printf '  %-12s %-14s %s\n' "Swift" ".swift" "compiled"
     printf '  %-12s %-14s %s\n' "Kotlin" ".kt" "compiled"
+    printf '  %-12s %-14s %s\n' "Lua" ".lua" "interpreted"
+    printf '  %-12s %-14s %s\n' "Perl" ".pl" "interpreted"
+    printf '  %-12s %-14s %s\n' "Julia" ".jl" "interpreted"
+    printf '  %-12s %-14s %s\n' "Dart" ".dart" "interpreted"
+    printf '  %-12s %-14s %s\n' "Elixir" ".exs" "interpreted"
 }
 
 CHECK_FAILURES=0
@@ -130,6 +136,11 @@ check_dependencies() {
     check_tool_group "Bash" bash
     check_tool_group "Swift" swift swiftc
     check_tool_group "Kotlin" kotlinc java
+    check_tool_group "Lua" lua
+    check_tool_group "Perl" perl
+    check_tool_group "Julia" julia
+    check_tool_group "Dart" dart
+    check_tool_group "Elixir" elixir
 
     echo
 
@@ -351,7 +362,7 @@ uninstall_coderun() {
 
 is_supported() {
     case "$ext" in
-        c|cpp|py|r|java|rs|js|ts|go|php|rb|sh|swift|kt)
+        c|cpp|py|r|java|rs|js|ts|go|php|rb|sh|swift|kt|lua|pl|jl|dart|exs)
             return 0
             ;;
         *)
@@ -483,6 +494,26 @@ run_file() {
             bash "$file"
             return $?
             ;;
+        lua)
+            lua "$file"
+            return $?
+            ;;
+        pl)
+            perl "$file"
+            return $?
+            ;;
+        jl)
+            julia "$file"
+            return $?
+            ;;
+        dart)
+            dart run "$file"
+            return $?
+            ;;
+        exs)
+            elixir "$file"
+            return $?
+            ;;
         java)
             java "$file"
             return $?
@@ -546,7 +577,7 @@ clean_file() {
     local custom_artifact
 
     case "$ext" in
-        py|r|js|ts|php|rb|sh)
+        py|r|js|ts|php|rb|sh|lua|pl|jl|dart|exs)
             echo "No build artifacts to clean for .$ext files (interpreted language)."
             return 0
             ;;
@@ -719,7 +750,7 @@ ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
 
 if ! is_supported; then
     echo "Unsupported file type: .$ext"
-    echo "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt"
+    echo "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt .lua .pl .jl .dart .exs"
     exit 1
 fi
 

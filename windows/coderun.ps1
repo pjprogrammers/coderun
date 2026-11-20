@@ -35,13 +35,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Keep in sync with the VERSION file.
-$CoderunVersion = "2.2.0"
+$CoderunVersion = "2.3.0"
 
 $UpdateUrl = "https://raw.githubusercontent.com/pjprogrammers/coderun/main/windows/coderun.ps1"
 $VersionUrl = "https://raw.githubusercontent.com/pjprogrammers/coderun/main/VERSION"
 
 $CompiledExtensions = @(".c", ".cpp", ".java", ".rs", ".go", ".swift", ".kt")
-$InterpretedExtensions = @(".py", ".r", ".js", ".ts", ".php", ".rb", ".sh")
+$InterpretedExtensions = @(".py", ".r", ".js", ".ts", ".php", ".rb", ".sh", ".lua", ".pl", ".jl", ".dart", ".exs")
 
 function Show-Help {
     Write-Host "coderun $CoderunVersion"
@@ -52,7 +52,7 @@ function Show-Help {
     Write-Host "  coderun --clean <file>"
     Write-Host "  coderun -o <output> <file>"
     Write-Host ""
-    Write-Host "Run source files in 14 languages with one command."
+    Write-Host "Run source files in 19 languages with one command."
     Write-Host ""
     Write-Host "Help:"
     Write-Host "  -h, --help           Show this help message"
@@ -76,7 +76,8 @@ function Show-Help {
     Write-Host "Supported languages:"
     Write-Host "  C (.c), C++ (.cpp), Python (.py), R (.R, .r), Java (.java),"
     Write-Host "  Rust (.rs), JavaScript (.js), TypeScript (.ts), Go (.go), PHP (.php),"
-    Write-Host "  Ruby (.rb), Bash (.sh), Swift (.swift), Kotlin (.kt)"
+    Write-Host "  Ruby (.rb), Bash (.sh), Swift (.swift), Kotlin (.kt), Lua (.lua),"
+    Write-Host "  Perl (.pl), Julia (.jl), Dart (.dart), Elixir (.exs)"
     Write-Host ""
     Write-Host "Examples:"
     Write-Host "  coderun main.cpp"
@@ -106,6 +107,11 @@ function Show-Languages {
     Write-Host ("  {0,-12} {1,-14} {2}" -f "Bash", ".sh", "interpreted")
     Write-Host ("  {0,-12} {1,-14} {2}" -f "Swift", ".swift", "compiled")
     Write-Host ("  {0,-12} {1,-14} {2}" -f "Kotlin", ".kt", "compiled")
+    Write-Host ("  {0,-12} {1,-14} {2}" -f "Lua", ".lua", "interpreted")
+    Write-Host ("  {0,-12} {1,-14} {2}" -f "Perl", ".pl", "interpreted")
+    Write-Host ("  {0,-12} {1,-14} {2}" -f "Julia", ".jl", "interpreted")
+    Write-Host ("  {0,-12} {1,-14} {2}" -f "Dart", ".dart", "interpreted")
+    Write-Host ("  {0,-12} {1,-14} {2}" -f "Elixir", ".exs", "interpreted")
 }
 
 function Check-Dependencies {
@@ -123,7 +129,12 @@ function Check-Dependencies {
         @{ Name = "Ruby"; Commands = @("ruby") },
         @{ Name = "Bash"; Commands = @("bash") },
         @{ Name = "Swift"; Commands = @("swift", "swiftc") },
-        @{ Name = "Kotlin"; Commands = @("kotlinc", "java") }
+        @{ Name = "Kotlin"; Commands = @("kotlinc", "java") },
+        @{ Name = "Lua"; Commands = @("lua") },
+        @{ Name = "Perl"; Commands = @("perl") },
+        @{ Name = "Julia"; Commands = @("julia") },
+        @{ Name = "Dart"; Commands = @("dart") },
+        @{ Name = "Elixir"; Commands = @("elixir") }
     )
 
     $failures = 0
@@ -666,7 +677,7 @@ $Extension = [System.IO.Path]::GetExtension($Name).ToLowerInvariant()
 
 if (($CompiledExtensions -notcontains $Extension) -and ($InterpretedExtensions -notcontains $Extension)) {
     Write-Host "Unsupported file type: $Extension"
-    Write-Host "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt"
+    Write-Host "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt .lua .pl .jl .dart .exs"
     exit 1
 }
 
@@ -748,6 +759,31 @@ switch ($Extension) {
     ".sh" {
         $bashFile = $File -replace '\\', '/'
         & bash $bashFile
+        exit $LASTEXITCODE
+    }
+
+    ".lua" {
+        & lua $File
+        exit $LASTEXITCODE
+    }
+
+    ".pl" {
+        & perl $File
+        exit $LASTEXITCODE
+    }
+
+    ".jl" {
+        & julia $File
+        exit $LASTEXITCODE
+    }
+
+    ".dart" {
+        & dart run $File
+        exit $LASTEXITCODE
+    }
+
+    ".exs" {
+        & elixir $File
         exit $LASTEXITCODE
     }
 
