@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ $# -eq 0 ]; then
     echo "Usage: coderun <file>"
@@ -6,10 +6,17 @@ if [ $# -eq 0 ]; then
 fi
 
 file="$1"
+
+if [ ! -f "$file" ]; then
+    echo "Error: file not found: $file"
+    exit 1
+fi
+
 dir="$(dirname "$file")"
 name="$(basename "$file")"
 base="${name%.*}"
 ext="${name##*.}"
+ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
 
 case "$ext" in
     cpp)
@@ -21,9 +28,42 @@ case "$ext" in
     py)
         python3 "$file"
         ;;
+    r)
+        Rscript "$file"
+        ;;
+    java)
+        java "$file"
+        ;;
+    rs)
+        rustc "$file" -o "$dir/$base" && "$dir/$base"
+        ;;
+    js)
+        node "$file"
+        ;;
+    ts)
+        tsx "$file"
+        ;;
+    go)
+        go run "$file"
+        ;;
+    php)
+        php "$file"
+        ;;
+    rb)
+        ruby "$file"
+        ;;
+    sh)
+        bash "$file"
+        ;;
+    swift)
+        swift "$file"
+        ;;
+    kt)
+        kotlinc "$file" -include-runtime -d "$dir/$base.jar" && java -jar "$dir/$base.jar"
+        ;;
     *)
         echo "Unsupported file type: .$ext"
-	echo "only file types .py .cpp .c are supported."
+        echo "Supported: .py .cpp .c .R .r .java .rs .js .ts .go .php .rb .sh .swift .kt"
         exit 1
         ;;
 esac

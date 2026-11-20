@@ -1,8 +1,8 @@
 # coderun
 
-A tiny cross-platform command-line runner for **C, C++ and Python**.
+A tiny cross-platform command-line runner for **14 programming languages**.
 
-`coderun` lets you compile and run C/C++ programs or directly run Python files using a single command.
+`coderun` compiles and runs compiled languages and directly runs interpreted languages using a single command.
 
 ```bash
 coderun main.cpp
@@ -86,9 +86,7 @@ coderun/
 | Swift | `.swift` | Swift | Swift | Swift |
 | Kotlin | `.kt` | Kotlin compiler | Kotlin compiler | Kotlin compiler |
 
-The required compiler or interpreter must already be installed on the system.
-
-Windows support for the additional languages depends on the corresponding runtime or compiler being installed and accessible through PATH. The Windows runner must also implement the corresponding language options.
+The required compiler or interpreter must already be installed on the system and accessible through PATH. Linux, macOS and Windows all support the same set of languages.
 
 ---
 
@@ -406,7 +404,7 @@ python
 
 A GCC distribution such as MinGW-w64 or MSYS2 can be used for C/C++ development.
 
-Additional languages require their respective compilers or runtimes, and the Windows runner must support their execution.
+Additional languages require their respective compilers or runtimes to be installed and accessible through PATH.
 
 ---
 
@@ -566,7 +564,7 @@ Versions use the `MAJOR.MINOR.PATCH` format:
 .kt
 ```
 
-**Note:** The documented language support must match the implementations in each platform's runner. The Windows runner and installation scripts may need updates before V2 can be considered fully cross-platform.
+**Note:** All platform runners implement the same language support. A language runs only when its compiler or runtime is installed.
 
 ---
 
