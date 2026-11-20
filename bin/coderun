@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Keep in sync with the VERSION file.
-CODERUN_VERSION="2.3.0"
+CODERUN_VERSION="2.3.1"
 
 UPDATE_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/bin/coderun"
 VERSION_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/VERSION"
@@ -14,6 +14,7 @@ C_COMPILER="gcc"
 CPP_COMPILER="g++"
 
 TEMP_FILE=""
+LATEST_VERSION=""
 
 cleanup_temp() {
     if [ -n "$TEMP_FILE" ]; then
@@ -240,11 +241,24 @@ version_greater() {
 }
 
 check_update() {
-    local latest
-    local status
-
     echo "Current version: $CODERUN_VERSION"
     echo "Checking for updates..."
+
+    fetch_latest_version || exit 1
+
+    echo "Latest version: $LATEST_VERSION"
+
+    if version_greater "$LATEST_VERSION" "$CODERUN_VERSION"; then
+        echo "A new version is available. Run 'coderun --update' to install it."
+        exit 1
+    fi
+
+    echo "coderun is up to date."
+    exit 0
+}
+
+fetch_latest_version() {
+    local status
 
     TEMP_FILE="${TMPDIR:-/tmp}/coderun-version.$$"
 
@@ -253,30 +267,22 @@ check_update() {
 
     if [ "$status" -eq 127 ]; then
         echo "Error: curl or wget is required to check for updates."
-        exit 1
+        return 1
     fi
 
     if [ "$status" -ne 0 ]; then
         echo "Error: could not check for updates."
-        exit 1
+        return 1
     fi
 
-    latest="$(tr -d '[:space:]' < "$TEMP_FILE")"
+    LATEST_VERSION="$(tr -d '[:space:]' < "$TEMP_FILE")"
 
-    if ! [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    if ! [[ "$LATEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "Error: could not read the latest version."
-        exit 1
+        return 1
     fi
 
-    echo "Latest version: $latest"
-
-    if version_greater "$latest" "$CODERUN_VERSION"; then
-        echo "A new version is available. Run 'coderun --update' to install it."
-        exit 1
-    fi
-
-    echo "coderun is up to date."
-    exit 0
+    return 0
 }
 
 update_coderun() {
@@ -289,9 +295,24 @@ update_coderun() {
         exit 1
     fi
 
+    echo "Current version: $CODERUN_VERSION"
+    echo "Checking for updates..."
+
+    fetch_latest_version || exit 1
+
+    echo "Latest version: $LATEST_VERSION"
+
+    if ! version_greater "$LATEST_VERSION" "$CODERUN_VERSION"; then
+        rm -f "$TEMP_FILE"
+        TEMP_FILE=""
+        echo "coderun is up to date ($CODERUN_VERSION)."
+        exit 0
+    fi
+
+    rm -f "$TEMP_FILE"
     TEMP_FILE="$target.tmp.$$"
 
-    echo "Updating coderun..."
+    echo "Updating coderun to $LATEST_VERSION..."
 
     download_file "$UPDATE_URL" "$TEMP_FILE"
     status=$?
@@ -316,7 +337,7 @@ update_coderun() {
         exit 1
     fi
 
-    echo "coderun updated successfully."
+    echo "coderun updated successfully to $LATEST_VERSION."
 }
 
 uninstall_coderun() {

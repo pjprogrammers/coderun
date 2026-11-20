@@ -35,7 +35,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Keep in sync with the VERSION file.
-$CoderunVersion = "2.3.0"
+$CoderunVersion = "2.3.1"
 
 $UpdateUrl = "https://raw.githubusercontent.com/pjprogrammers/coderun/main/windows/coderun.ps1"
 $VersionUrl = "https://raw.githubusercontent.com/pjprogrammers/coderun/main/VERSION"
@@ -217,10 +217,7 @@ function Test-VersionGreater([string]$Left, [string]$Right) {
     return $false
 }
 
-function Check-ForUpdate {
-    Write-Host "Current version: $CoderunVersion"
-    Write-Host "Checking for updates..."
-
+function Get-LatestVersion {
     $temp = Join-Path ([System.IO.Path]::GetTempPath()) "coderun-version-$PID.txt"
     $latest = $null
 
@@ -246,6 +243,15 @@ function Check-ForUpdate {
         exit 1
     }
 
+    return $latest
+}
+
+function Check-ForUpdate {
+    Write-Host "Current version: $CoderunVersion"
+    Write-Host "Checking for updates..."
+
+    $latest = Get-LatestVersion
+
     Write-Host "Latest version: $latest"
 
     if (Test-VersionGreater $latest $CoderunVersion) {
@@ -267,9 +273,21 @@ function Update-Coderun {
         exit 1
     }
 
+    Write-Host "Current version: $CoderunVersion"
+    Write-Host "Checking for updates..."
+
+    $latest = Get-LatestVersion
+
+    Write-Host "Latest version: $latest"
+
+    if (-not (Test-VersionGreater $latest $CoderunVersion)) {
+        Write-Host "coderun is up to date ($CoderunVersion)."
+        exit 0
+    }
+
     $temp = Join-Path $installDir "coderun.ps1.tmp"
 
-    Write-Host "Updating coderun..."
+    Write-Host "Updating coderun to $latest..."
 
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -289,7 +307,7 @@ function Update-Coderun {
         exit 1
     }
 
-    Write-Host "coderun updated successfully."
+    Write-Host "coderun updated successfully to $latest."
 }
 
 function Uninstall-Coderun {

@@ -78,7 +78,7 @@ Different languages usually mean different commands:
 
 | | |
 | --- | --- |
-| **Current version** | 2.3.0 |
+| **Current version** | 2.3.1 |
 | **Languages** | 19 — 7 compiled, 12 interpreted |
 | **Operating systems** | 3 — Linux, macOS, Windows |
 | **Interface** | Command line |
@@ -197,6 +197,12 @@ Open PowerShell in the repository directory:
 git clone https://github.com/pjprogrammers/coderun.git
 cd coderun
 .\install.ps1
+```
+
+Command Prompt users can run the wrapper, which invokes the same installer with the execution policy bypassed:
+
+```cmd
+install.cmd
 ```
 
 If PowerShell blocks the script, run:
@@ -527,7 +533,7 @@ Confirm the upgrade:
 
 ```bash
 coderun --version
-# coderun 2.3.0
+# coderun 2.3.1
 ```
 
 The installers replace the existing runner file and keep the existing PATH entry. On Linux/macOS, use `which -a coderun` to check for an older copy earlier in PATH; on Windows, use `Get-Command coderun -All`.
@@ -551,7 +557,10 @@ This is a check only; it does not change anything.
 coderun --update
 ```
 
-`--update` downloads the platform-specific runner from the project repository and replaces the installed copy.
+`--update` checks the published version before downloading anything:
+
+- If the installed version is current, it reports `coderun is up to date (<version>).` and exits `0` without replacing the installed runner.
+- If a newer version is available, it downloads the platform-specific runner, replaces the installed copy, and reports the new version.
 
 `--update` requires V2.1.0 or newer; older versions must upgrade once using the installer or a manual download. See [Upgrading from V1.0.0 or V2.0.0](#upgrading-from-v100-or-v200).
 
@@ -559,6 +568,7 @@ coderun --update
 - Windows: uses PowerShell's `Invoke-WebRequest`.
 - The runner must already be installed in the standard location.
 - Downloads are validated before replacing the existing runner.
+- A failed version check or download leaves the installed runner unchanged.
 
 ### Uninstall
 
@@ -605,8 +615,9 @@ coderun/
 ├── install.sh           # Linux installer
 ├── install-mac.sh       # macOS installer
 ├── install.ps1          # Windows installer
+├── install.cmd          # Command Prompt wrapper for install.ps1
 ├── coderun              # Legacy root copy of the Linux runner
-├── VERSION              # Release version (2.3.0)
+├── VERSION              # Release version (2.3.1)
 ├── README.md
 └── LICENSE
 ```
@@ -619,6 +630,7 @@ coderun/
 | `install.sh` | Installs the Linux runner to `~/.local/bin` |
 | `install-mac.sh` | Installs the macOS runner to `~/.local/bin` |
 | `install.ps1` | Installs the Windows runner to `%USERPROFILE%\bin` |
+| `install.cmd` | Command Prompt wrapper for `install.ps1` |
 | `coderun` | Legacy copy of the Linux runner |
 | `VERSION` | Single tracked release version, mirrored in the runners |
 | `README.md` | Project documentation |
@@ -658,17 +670,18 @@ coderun/
 
 The release version is tracked in [`VERSION`](VERSION) and mirrored in the Linux, macOS, and Windows runners. `coderun --version` prints the installed runner's version.
 
-### Current release: V2.3.0
+### Current release: V2.3.1
 
-V2.3.0 adds five interpreted languages:
+V2.3.1 makes `--update` version-aware and adds a Command Prompt installer:
 
-- Lua (`.lua`)
-- Perl (`.pl`)
-- Julia (`.jl`)
-- Dart (`.dart`)
-- Elixir (`.exs`)
+- Running `coderun --update` now checks the published `VERSION` before downloading.
+- When the installed version is current, it prints `coderun is up to date (2.3.1).` and exits `0` without replacing the runner.
+- When a newer release exists, it downloads it and prints `coderun updated successfully to <version>.`
+- A failed version check or download exits `1` and leaves the installed runner untouched.
+- Added `install.cmd`, which runs `install.ps1` from Command Prompt with the execution policy bypassed.
+- `--check-update` and all language behavior are unchanged.
 
-All five run directly, so `--compile` reports that they are interpreted and `--clean` reports that there are no artifacts. Existing commands and exit-code behavior are unchanged.
+V2.3.0 added Lua, Perl, Julia, Dart, and Elixir; see the release history below.
 
 ### Release history
 
@@ -679,6 +692,7 @@ All five run directly, so `--compile` reports that they are interpreted and `--c
 | V2.1.0 | [v2.1.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.1.0) | Added help, version, update, and uninstall flags |
 | V2.2.0 | [v2.2.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.2.0) | Added list, check, info, check-update, compile, clean, and output options |
 | V2.3.0 | [v2.3.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.0) | Added Lua, Perl, Julia, Dart, and Elixir |
+| V2.3.1 | [v2.3.1](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.1) | Made `--update` version-aware and added a Command Prompt installer |
 
 ---
 
