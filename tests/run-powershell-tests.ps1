@@ -288,7 +288,8 @@ try {
 
     $result = Invoke-Runner @($pythonFile, "--verbose", "a b")
     Assert-Equal "python receives arguments" "0" "$($result.Code)"
-    Assert-Contains "python output has forwarded arguments" "PYTHON:$pythonFile --verbose a b" $result.Output
+    Assert-Contains "python output has forwarded arguments" "PYTHON:$pythonFile --verbose" $result.Output
+    Assert-Contains "python output includes the spaced argument" "a b" $result.Output
 
     $result = Invoke-Runner @($pythonFile, "--list")
     if (-not $result.Output.Contains("Supported languages:")) {

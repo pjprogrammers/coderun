@@ -5,6 +5,12 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNNER="$ROOT/bin/coderun"
 PYTHON="$(command -v python3 || true)"
+HOST_OS="$(uname -s 2>/dev/null || echo unknown)"
+if [ "$HOST_OS" = "Darwin" ]; then
+    PLATFORM_PATH="bin/coderun-mac"
+else
+    PLATFORM_PATH="bin/coderun"
+fi
 TMP="${TMPDIR:-/tmp}/coderun-update-tests.$$"
 SERVE="$TMP/serve"
 HOME_DIR="$TMP/home"
@@ -179,13 +185,13 @@ mv "$SERVE/main/VERSION.bak" "$SERVE/main/VERSION"
 # 6. Missing runner download.
 reset_target
 before="$(target_hash)"
-mv "$SERVE/v9.9.9/bin/coderun" "$SERVE/v9.9.9/bin/coderun.bak"
+mv "$SERVE/v9.9.9/$PLATFORM_PATH" "$SERVE/v9.9.9/$PLATFORM_PATH.bak"
 output="$(run_update --update 2>&1)"
 code=$?
 assert_eq "download failure exits 1" "1" "$code"
 assert_contains "download failure message" "Error: update download failed." "$output"
 assert_eq "download failure leaves target unchanged" "$before" "$(target_hash)"
-mv "$SERVE/v9.9.9/bin/coderun.bak" "$SERVE/v9.9.9/bin/coderun"
+mv "$SERVE/v9.9.9/$PLATFORM_PATH.bak" "$SERVE/v9.9.9/$PLATFORM_PATH"
 
 # 7. Missing SHA256SUMS.
 reset_target
@@ -201,7 +207,7 @@ mv "$SERVE/v9.9.9/SHA256SUMS.bak" "$SERVE/v9.9.9/SHA256SUMS"
 # 8. Incorrect checksum.
 reset_target
 before="$(target_hash)"
-printf '%064d  bin/coderun\n' 0 > "$SERVE/v9.9.9/SHA256SUMS"
+printf '%064d  bin/coderun\n%064d  bin/coderun-mac\n' 0 0 > "$SERVE/v9.9.9/SHA256SUMS"
 output="$(run_update --update 2>&1)"
 code=$?
 assert_eq "bad checksum exits 1" "1" "$code"
