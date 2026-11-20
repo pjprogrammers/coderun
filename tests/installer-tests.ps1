@@ -130,9 +130,18 @@ function Invoke-Installer {
         $env:PATH = "$ToolsDirectory$PathSeparator$(Join-Path $TempRoot 'empty-bin')"
     }
 
-    $lines = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $Installer 2>&1
-    $code = $LASTEXITCODE
-    $text = ($lines | Out-String)
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $lines = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $Installer 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+
+    $text = ($lines | ForEach-Object { "$_" } | Out-String)
 
     return [pscustomobject]@{
         Output = $text

@@ -87,9 +87,18 @@ function Assert-Contains {
 function Invoke-Runner {
     param([string[]]$Arguments)
 
-    $lines = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $Runner @Arguments 2>&1
-    $code = $LASTEXITCODE
-    $text = ($lines | Out-String)
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $lines = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $Runner @Arguments 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+
+    $text = ($lines | ForEach-Object { "$_" } | Out-String)
 
     return [pscustomobject]@{
         Output = $text
@@ -101,9 +110,18 @@ function Invoke-InstalledRunner {
     param([string[]]$Arguments)
 
     $target = Join-Path (Join-Path $TempHome "bin") "coderun.ps1"
-    $lines = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $target @Arguments 2>&1
-    $code = $LASTEXITCODE
-    $text = ($lines | Out-String)
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $lines = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $target @Arguments 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+
+    $text = ($lines | ForEach-Object { "$_" } | Out-String)
 
     return [pscustomobject]@{
         Output = $text
