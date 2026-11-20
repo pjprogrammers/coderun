@@ -10,15 +10,19 @@ coderun main.c
 coderun main.py
 ```
 
-**Version:** V2.0.0
+**Version:** V2.1.0
 
-**Previous Version:** V1.0.0
+**Previous Version:** V2.0.0
 
 ---
 
 ## Features
 
 - Simple `coderun <file>` command
+- Help flags: `coderun -h` and `coderun --help`
+- Version check with `coderun -v` and `coderun --version`
+- Self-update with `coderun --update`
+- Clean removal with `coderun --uninstall`
 - Supports C, C++, Python, R, Java, Rust, JavaScript, TypeScript, Go, PHP, Ruby, Bash, Swift and Kotlin
 - Automatic compilation for compiled languages
 - Uses GCC/G++ on Linux
@@ -48,6 +52,7 @@ coderun/
 ├── install-mac.sh
 ├── install.ps1
 │
+├── VERSION
 ├── README.md
 └── LICENSE
 ```
@@ -62,6 +67,7 @@ coderun/
 | `install.sh` | Automated Linux installation |
 | `install-mac.sh` | Automated macOS installation |
 | `install.ps1` | Automated Windows installation |
+| `VERSION` | Current project version |
 | `README.md` | Project documentation |
 | `LICENSE` | Project license |
 
@@ -174,6 +180,40 @@ coderun main.cpp
 ---
 
 ## Usage
+
+### Help
+
+```bash
+coderun -h
+coderun --help
+```
+
+Displays the available options, supported languages and examples.
+
+### Version
+
+```bash
+coderun -v
+coderun --version
+```
+
+Displays the installed version.
+
+### Update
+
+```bash
+coderun --update
+```
+
+Downloads the latest version from the project repository and replaces the installed runner. On Linux and macOS, `curl` or `wget` is required.
+
+### Uninstall
+
+```bash
+coderun --uninstall
+```
+
+Removes the installed runner and its PATH entry.
 
 ### C++
 
@@ -513,6 +553,20 @@ One command handles the rest.
 
 ## Version
 
+The current version is recorded in the [`VERSION`](VERSION) file and is available at runtime with `coderun --version`.
+
+### V2.1.0 — Command-Line Options
+
+**Release type:** Minor feature release
+
+**Highlights:**
+
+- Added `-h` and `--help` to display usage, options and supported languages.
+- Added `-v` and `--version` to display the installed version.
+- Added `--update` to download and install the latest runner.
+- Added `--uninstall` to remove the installed runner and its PATH entry.
+- Updated the Linux, macOS and Windows runners together.
+
 ### V2.0.0 — Multi-Language Support
 
 **Release type:** Major feature release
@@ -543,6 +597,7 @@ Versions use the `MAJOR.MINOR.PATCH` format:
 | ------- | ----------- |
 | V1.0.0 | Initial release with C, C++ and Python support |
 | V2.0.0 | Expanded language support and multi-language execution |
+| V2.1.0 | Added help, version, update and uninstall flags |
 
 ### Current Supported File Types
 

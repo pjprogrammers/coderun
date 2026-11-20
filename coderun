@@ -1,9 +1,155 @@
 #!/usr/bin/env bash
 
+# Keep in sync with the VERSION file.
+CODERUN_VERSION="2.1.0"
+
+UPDATE_URL="https://raw.githubusercontent.com/pjprogrammers/coderun/main/bin/coderun"
+INSTALL_DIR="$HOME/.local/bin"
+BASH_CONFIG="$HOME/.bashrc"
+
+show_help() {
+    echo "coderun $CODERUN_VERSION"
+    echo
+    cat <<'EOF'
+Usage: coderun <file>
+
+Run source files in 14 languages with one command.
+
+Options:
+  -h, --help       Show this help message
+  -v, --version    Show the installed version
+  --update         Update coderun to the latest version
+  --uninstall      Remove coderun from this system
+
+Supported languages:
+  C (.c), C++ (.cpp), Python (.py), R (.R, .r), Java (.java),
+  Rust (.rs), JavaScript (.js), TypeScript (.ts), Go (.go), PHP (.php),
+  Ruby (.rb), Bash (.sh), Swift (.swift), Kotlin (.kt)
+
+Examples:
+  coderun main.cpp
+  coderun main.py
+  coderun Main.java
+
+Note: The required compiler or runtime must be installed and on PATH.
+EOF
+}
+
+update_coderun() {
+    local target="$INSTALL_DIR/coderun"
+    local downloader
+
+    if [ ! -f "$target" ]; then
+        echo "Error: coderun is not installed at $target."
+        echo "Run ./install.sh from the repository first."
+        exit 1
+    fi
+
+    if command -v curl >/dev/null 2>&1; then
+        downloader="curl"
+    elif command -v wget >/dev/null 2>&1; then
+        downloader="wget"
+    else
+        echo "Error: curl or wget is required to update coderun."
+        exit 1
+    fi
+
+    tmp="$target.tmp.$$"
+    trap 'rm -f "$tmp"' EXIT
+
+    echo "Updating coderun..."
+    if [ "$downloader" = "curl" ]; then
+        curl -fsSL "$UPDATE_URL" -o "$tmp" || {
+            echo "Error: update download failed."
+            exit 1
+        }
+    else
+        wget -qO "$tmp" "$UPDATE_URL" || {
+            echo "Error: update download failed."
+            exit 1
+        }
+    fi
+
+    if [ "$(head -n 1 "$tmp")" != "#!/usr/bin/env bash" ]; then
+        echo "Error: downloaded file does not look like a valid coderun script."
+        exit 1
+    fi
+
+    if ! chmod 755 "$tmp" || ! mv "$tmp" "$target"; then
+        echo "Error: could not replace $target."
+        exit 1
+    fi
+
+    trap - EXIT
+    echo "coderun updated successfully."
+}
+
+uninstall_coderun() {
+    local target="$INSTALL_DIR/coderun"
+    local removed=0
+    local install_dir_empty=0
+
+    if [ -f "$target" ]; then
+        rm -f "$target"
+        echo "Removed $target"
+        removed=1
+    fi
+
+    if [ -d "$INSTALL_DIR" ]; then
+        if [ -z "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
+            install_dir_empty=1
+        fi
+    else
+        install_dir_empty=1
+    fi
+
+    if [ "$install_dir_empty" -eq 1 ]; then
+        if [ -f "$BASH_CONFIG" ] && grep -qF 'export PATH="$HOME/.local/bin:$PATH"' "$BASH_CONFIG"; then
+            sed -i '/^export PATH="\$HOME\/\.local\/bin:\$PATH"$/d' "$BASH_CONFIG"
+            echo "Removed coderun PATH entry from $BASH_CONFIG"
+        fi
+
+        rmdir "$INSTALL_DIR" 2>/dev/null || true
+    else
+        echo "Kept $INSTALL_DIR in PATH because it contains other files."
+    fi
+
+    if [ "$removed" -eq 0 ]; then
+        echo "coderun was not installed at $target."
+    else
+        echo "coderun uninstalled successfully."
+        echo "Open a new terminal to finish."
+    fi
+}
+
 if [ $# -eq 0 ]; then
-    echo "Usage: coderun <file>"
+    show_help
     exit 1
 fi
+
+case "$1" in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    -v|--version)
+        echo "coderun $CODERUN_VERSION"
+        exit 0
+        ;;
+    --update)
+        update_coderun
+        exit 0
+        ;;
+    --uninstall)
+        uninstall_coderun
+        exit 0
+        ;;
+    -*)
+        echo "Unknown option: $1"
+        echo "Try 'coderun --help' for more information."
+        exit 1
+        ;;
+esac
 
 file="$1"
 
