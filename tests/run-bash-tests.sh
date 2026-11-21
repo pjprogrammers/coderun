@@ -4,6 +4,7 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNNER="$ROOT/bin/coderun"
+CURRENT_VERSION="$(cat "$ROOT/VERSION")"
 BASH_BIN="/bin/bash"
 HOST_OS="${CODERUN_TEST_OS:-$(uname -s 2>/dev/null || echo unknown)}"
 
@@ -70,7 +71,7 @@ log_contains() {
 # ---------------------------------------------------------------------------
 
 output="$(run_runner --version)"
-assert_eq "version" "coderun 2.4.0" "$output"
+assert_eq "version" "coderun $CURRENT_VERSION" "$output"
 
 output="$(run_runner --help)"
 assert_contains "help shows argument forwarding" "program args" "$output"

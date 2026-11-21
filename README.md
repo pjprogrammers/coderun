@@ -857,22 +857,16 @@ The release version is tracked in [`VERSION`](VERSION) and mirrored in the Linux
 
 ### Current release: V2.4.1
 
-V2.4.0 is the largest release since the project moved to a multi-language runner:
+V2.4.1 is a maintenance release that completes the source-layout refactor and hardens the release pipeline:
 
-- **Program arguments are forwarded.** `coderun main.py --verbose` and `coderun main.cpp input.txt` now work. Everything after the source file belongs to the program; `--compile`, `--clean`, `-o`, and coderun's other options only apply before the file.
-- **Seven new languages:** Zig, Nim, Fortran, Pascal, Crystal, C# (file-based apps), and F# scripts. The total is now 26 languages: 12 compiled and 14 interpreted.
-- **Runtime selection:** `--runtime node|bun|deno` for JavaScript and TypeScript.
-- **Friendlier checks:** `--check` is informational and exits `0`; `--check <language>` requires one toolchain; `--check --strict` fails when anything is missing.
-- **Installers are decoupled:** `install.sh`, `install-mac.sh`, and `install.ps1` install the runner unconditionally and warn about missing baseline tools.
-- **Verbose listing:** `--list --verbose` shows whether each language's tools are installed.
-- **Shell completions:** `--completions bash|zsh|fish|powershell`.
-- **Output controls:** `--time` reports elapsed time on stderr; `-q` / `--quiet` suppresses coderun's own messages.
-- **Hardened updates:** downloads come from the versioned tag, the runner's embedded version must match the announced release, `SHA256SUMS` is verified, and replacement stays atomic.
-- **One Unix runner:** Linux and macOS now share `bin/coderun`; `bin/coderun-mac` is a generated copy kept for compatibility with the macOS installer and updater.
-- **Table-driven language metadata:** adding a language no longer requires editing a dozen dispatch blocks in each runner.
-- **Real tests and CI:** Unix and Windows suites cover every language with fake toolchains, update security cases, and installer behavior. CI runs on Ubuntu, macOS, and Windows, including PowerShell 7 and Windows PowerShell 5.1.
+- **Modular sources:** the Bash runner is split across `src/unix/` and the PowerShell runner across `src/windows/`.
+- **Single-file artifacts:** `scripts/build.sh` generates `bin/coderun`, `bin/coderun-mac`, and `windows/coderun.ps1` from the modules, so installation and self-updates still use one file.
+- **Cleaner repository:** removed the legacy root `coderun` copy and the obsolete `scripts/sync.sh` wrapper.
+- **Windows update reliability:** the updater now accepts generated runners whose banner comments precede `param()`.
+- **Release-proof tests:** the Unix suites read the current version from `VERSION` instead of hardcoding it.
+- **Developer tooling:** added `Makefile`, `.editorconfig`, `.gitignore`, `CONTRIBUTING.md`, and maintainer documentation under `docs/`.
 
-V2.3.1 made `--update` version-aware and added `install.cmd`. V2.3.0 added Lua, Perl, Julia, Dart, and Elixir; see the release history below.
+All 26 languages and command-line options are unchanged from V2.4.0. V2.4.0 introduced argument forwarding, seven new languages, runtime selection, verified updates, and the unified Unix runner; see the release history below.
 
 ### Release history
 
@@ -885,6 +879,7 @@ V2.3.1 made `--update` version-aware and added `install.cmd`. V2.3.0 added Lua, 
 | V2.3.0 | [v2.3.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.0) | Added Lua, Perl, Julia, Dart, and Elixir |
 | V2.3.1 | [v2.3.1](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.1) | Made `--update` version-aware and added a Command Prompt installer |
 | V2.4.0 | [v2.4.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.4.0) | Argument forwarding, 7 new languages, runtime selection, verified updates, unified Unix runner, and CI |
+| V2.4.1 | [v2.4.1](https://github.com/pjprogrammers/coderun/releases/tag/v2.4.1) | Modular source layout, generated artifacts, repository cleanup, and Windows update reliability |
 
 ### Release process
 

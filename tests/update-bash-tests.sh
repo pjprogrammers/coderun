@@ -4,6 +4,7 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNNER="$ROOT/bin/coderun"
+CURRENT_VERSION="$(cat "$ROOT/VERSION")"
 PYTHON="$(command -v python3 || true)"
 HOST_OS="$(uname -s 2>/dev/null || echo unknown)"
 if [ "$HOST_OS" = "Darwin" ]; then
@@ -44,7 +45,7 @@ source "$ROOT/tests/lib/hash.sh"
 make_candidate() {
     local version="$1"
 
-    sed "s/CODERUN_VERSION=\"2.4.0\"/CODERUN_VERSION=\"$version\"/" "$RUNNER" > "$SERVE/v9.9.9/bin/coderun"
+    sed "s/^CODERUN_VERSION=\"[0-9][0-9.]*\"$/CODERUN_VERSION=\"$version\"/" "$RUNNER" > "$SERVE/v9.9.9/bin/coderun"
     cp "$SERVE/v9.9.9/bin/coderun" "$SERVE/v9.9.9/bin/coderun-mac"
     chmod 755 "$SERVE/v9.9.9/bin/coderun" "$SERVE/v9.9.9/bin/coderun-mac"
     write_checksums
@@ -77,7 +78,7 @@ target_version() {
     sed -n 's/^CODERUN_VERSION="\([0-9][0-9.]*\)"$/\1/p' "$HOME_DIR/.local/bin/coderun" | head -n 1
 }
 
-printf '2.4.0\n' > "$SERVE/main/VERSION"
+printf '%s\n' "$CURRENT_VERSION" > "$SERVE/main/VERSION"
 make_candidate "9.9.9"
 
 "$PYTHON" -m http.server "$PORT" --bind 127.0.0.1 --directory "$SERVE" >/dev/null 2>&1 &
@@ -90,7 +91,7 @@ before="$(target_hash)"
 output="$(run_update --update 2>&1)"
 code=$?
 assert_eq "up to date exits 0" "0" "$code"
-assert_contains "up to date message" "coderun is up to date (2.4.0)." "$output"
+assert_contains "up to date message" "coderun is up to date ($CURRENT_VERSION)." "$output"
 assert_eq "up to date leaves target unchanged" "$before" "$(target_hash)"
 
 # 2. Newer version with valid checksum.
@@ -105,7 +106,7 @@ assert_eq "update installs new version" "9.9.9" "$(target_version)"
 
 # 3. check-update behavior.
 reset_target
-printf '2.4.0\n' > "$SERVE/main/VERSION"
+printf '%s\n' "$CURRENT_VERSION" > "$SERVE/main/VERSION"
 output="$(run_update --check-update 2>&1)"
 code=$?
 assert_eq "check-update current exits 0" "0" "$code"

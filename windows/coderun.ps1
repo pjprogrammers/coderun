@@ -576,9 +576,11 @@ function Update-Coderun {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -Uri "$CoderunRawBase/v$latest/$RunnerPath" -OutFile $temp -UseBasicParsing
 
-        $firstLine = Get-Content -LiteralPath $temp -TotalCount 1
+        $firstCodeLine = Get-Content -LiteralPath $temp |
+            Where-Object { $_ -notmatch '^\s*#' -and $_ -notmatch '^\s*$' } |
+            Select-Object -First 1
 
-        if ($firstLine -notmatch '^param\(') {
+        if ($firstCodeLine -notmatch '^\s*param\(') {
             throw "Downloaded file does not look like a valid coderun script."
         }
 
