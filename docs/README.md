@@ -11,6 +11,12 @@ the document that matches what you are trying to do.
 | [Release](release.md) | Cut a release, update versions and checksums, or understand the published artifacts. |
 | [Code style](code-style.md) | Match the project's Bash, PowerShell, and documentation conventions. |
 
+## Workflow map
+
+![How every file connects](workflow-map.png)
+
+The map shows how source modules become generated runners, how checks and tests gate a release, and how installers and self-updates consume the published files. It is drawn for v2.4.1.
+
 If you only have five minutes, read
 [Development](development.md#quick-start) and then run:
 

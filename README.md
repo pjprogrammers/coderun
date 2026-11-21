@@ -737,7 +737,8 @@ coderun/
 │   ├── development.md
 │   ├── testing.md
 │   ├── release.md
-│   └── code-style.md
+│   ├── code-style.md
+│   └── workflow-map.png # Visual map of how the files connect
 ├── .github/
 │   ├── workflows/ci.yml
 │   └── PSScriptAnalyzerSettings.psd1
@@ -773,7 +774,7 @@ coderun/
 | `tests/installer-tests.ps1` | Windows installer tests with temporary `USERPROFILE` values |
 | `tests/fake-tool.sh` | Fake toolchain shim used by Unix tests |
 | `tests/lib/` | Shared assertions and hashing helpers |
-| `docs/` | Maintainer documentation: architecture, development, testing, release, and style |
+| `docs/` | Maintainer documentation: architecture, development, testing, release, style, and the workflow map |
 | `.github/workflows/ci.yml` | Linux, macOS, and Windows CI matrix |
 | `.github/PSScriptAnalyzerSettings.psd1` | PSScriptAnalyzer rules for the Windows runner |
 | `install.sh` | Installs the runner to `~/.local/bin` on Linux |
@@ -815,7 +816,7 @@ See [`docs/`](docs/README.md) for the architecture, development workflow, testin
 - Generated files are marked with a `GENERATED FILE - DO NOT EDIT` banner.
 - `scripts/build.sh --check` fails when a generated file is stale.
 
-The design and module responsibilities are documented in [docs/architecture.md](docs/architecture.md).
+The design and module responsibilities are documented in [docs/architecture.md](docs/architecture.md). For a visual overview of how every file connects, see the [workflow map](docs/workflow-map.png).
 
 ---
 
