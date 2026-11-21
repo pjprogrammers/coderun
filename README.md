@@ -84,7 +84,7 @@ Different languages usually mean different commands:
 
 | | |
 | --- | --- |
-| **Current version** | 2.4.1 |
+| **Current version** | 2.4.2 |
 | **Languages** | 26 — 12 compiled, 14 interpreted |
 | **Operating systems** | 3 — Linux, macOS, Windows |
 | **Interface** | Command line |
@@ -746,7 +746,7 @@ coderun/
 ├── install-mac.sh       # macOS installer
 ├── install.ps1          # Windows installer
 ├── install.cmd          # Command Prompt wrapper for install.ps1
-├── VERSION              # Release version (2.4.1)
+├── VERSION              # Release version (2.4.2)
 ├── SHA256SUMS           # Checksums for release files
 ├── Makefile             # Common developer tasks
 ├── CONTRIBUTING.md      # Contributor guide
@@ -856,7 +856,7 @@ The design and module responsibilities are documented in [docs/architecture.md](
 
 The release version is tracked in [`VERSION`](VERSION) and mirrored in the Linux, macOS, and Windows runners. `coderun --version` prints the installed runner's version.
 
-### Current release: V2.4.1
+### Current release: V2.4.2
 
 V2.4.1 is a maintenance release that completes the source-layout refactor and hardens the release pipeline:
 
