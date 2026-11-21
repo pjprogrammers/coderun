@@ -7,6 +7,7 @@ FILES=(
     "bin/coderun"
     "bin/coderun-mac"
     "windows/coderun.ps1"
+    "windows/coderun.cmd"
     "install.sh"
     "install-mac.sh"
     "install.ps1"
