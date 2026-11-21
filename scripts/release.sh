@@ -13,7 +13,7 @@ usage() {
     cat <<'EOF'
 Usage: scripts/release.sh <version> [--notes <file>] [--no-push]
 
-Bumps the version, syncs the platform runners, regenerates SHA256SUMS,
+Bumps the version, rebuilds the runners, regenerates SHA256SUMS,
 runs the checks, commits, tags, pushes, and creates a GitHub release.
 
 Examples:
@@ -91,14 +91,14 @@ replace_line() {
 }
 
 printf '%s\n' "$VERSION" > VERSION
-replace_line bin/coderun 's/^CODERUN_VERSION="[0-9.]*"$/CODERUN_VERSION="'"$VERSION"'"/'
-replace_line windows/coderun.ps1 's/^\$CoderunVersion = "[0-9.]*"$/$CoderunVersion = "'"$VERSION"'"/'
+replace_line src/unix/10-config.sh 's/^CODERUN_VERSION="[0-9.]*"$/CODERUN_VERSION="'"$VERSION"'"/'
+replace_line src/windows/00-header.ps1 's/^\$CoderunVersion = "[0-9.]*"$/$CoderunVersion = "'"$VERSION"'"/'
 
 replace_line README.md 's/^| \*\*Current version\*\* | [0-9.]* |$/| **Current version** | '"$VERSION"' |/'
 replace_line README.md 's/^### Current release: V[0-9.]*$/### Current release: V'"$VERSION"'/'
 replace_line README.md 's/^├── VERSION              # Release version ([0-9.]*)$/├── VERSION              # Release version ('"$VERSION"')/'
 
-scripts/sync.sh
+scripts/build.sh
 scripts/checksums.sh
 scripts/check.sh
 

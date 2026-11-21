@@ -24,59 +24,8 @@ for command in cp chmod cmp dirname grep mkdir touch; do
     fi
 done
 
-ok() {
-    echo "PASS: $1"
-    PASS=$((PASS + 1))
-}
-
-bad() {
-    echo "FAIL: $1"
-    if [ $# -gt 1 ]; then
-        printf '%s\n' "$2"
-    fi
-    FAIL=$((FAIL + 1))
-}
-
-assert_eq() {
-    local name="$1"
-    local expected="$2"
-    local actual="$3"
-
-    if [ "$expected" = "$actual" ]; then
-        ok "$name"
-    else
-        bad "$name" "expected: <$expected>
-actual:   <$actual>"
-    fi
-}
-
-assert_contains() {
-    local name="$1"
-    local needle="$2"
-    local haystack="$3"
-
-    if printf '%s' "$haystack" | grep -qF -- "$needle"; then
-        ok "$name"
-    else
-        bad "$name" "missing: <$needle>
-output:
-$haystack"
-    fi
-}
-
-assert_not_contains() {
-    local name="$1"
-    local needle="$2"
-    local haystack="$3"
-
-    if printf '%s' "$haystack" | grep -qF -- "$needle"; then
-        bad "$name" "unexpected: <$needle>
-output:
-$haystack"
-    else
-        ok "$name"
-    fi
-}
+# shellcheck source=tests/lib/assertions.sh
+source "$ROOT/tests/lib/assertions.sh"
 
 make_fake_tools() {
     local directory="$1"

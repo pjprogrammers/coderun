@@ -36,19 +36,22 @@ jobs:
         run: |
           bash -n bin/coderun
           bash -n bin/coderun-mac
-          bash -n coderun
           bash -n install.sh
           bash -n install-mac.sh
-          bash -n scripts/sync.sh
-          bash -n scripts/checksums.sh
-          bash -n scripts/check.sh
-          bash -n scripts/release.sh
-          bash -n tests/run-bash-tests.sh
-          bash -n tests/update-bash-tests.sh
-          bash -n tests/installer-tests.sh
+          for file in src/unix/*.sh scripts/*.sh tests/*.sh tests/lib/*.sh; do
+            bash -n "$file"
+          done
 
       - name: ShellCheck
-        run: shellcheck -S warning bin/coderun install.sh install-mac.sh scripts/*.sh tests/*.sh
+        run: |
+          shellcheck -S warning \
+            bin/coderun \
+            install.sh \
+            install-mac.sh \
+            scripts/*.sh \
+            src/unix/*.sh \
+            tests/*.sh \
+            tests/lib/*.sh
 
       - name: Consistency checks
         run: ./scripts/check.sh

@@ -1,8 +1,33 @@
+# =============================================================================
+# coderun - run source files in 26 languages with one command.
+#
+# GENERATED FILE - DO NOT EDIT.
+# Source modules live in src/windows/ and are concatenated by scripts/build.sh.
+# Edit the modules, then run: ./scripts/build.sh
+#
+# Module order:
+#   src/windows/00-header.ps1
+#   src/windows/10-languages.ps1
+#   src/windows/20-output.ps1
+#   src/windows/30-completions.ps1
+#   src/windows/40-info.ps1
+#   src/windows/50-update.ps1
+#   src/windows/60-execution.ps1
+#   src/windows/70-cli.ps1
+# =============================================================================
+
+# =============================================================================
+# 00-header.ps1 - Script parameters, version, and shared configuration
+#
+# This module is concatenated first. The generated windows/coderun.ps1 must
+# keep param() as its first statement (comments are allowed before it).
+# =============================================================================
+
 param()
 
 $ErrorActionPreference = "Stop"
 
-# Keep in sync with the VERSION file.
+# Keep in sync with the VERSION file. scripts/release.sh updates this line.
 $CoderunVersion = "2.4.0"
 
 # Override for testing or mirrors. The runner appends /main or /v<version>.
@@ -17,7 +42,17 @@ $RunnerPath = "windows/coderun.ps1"
 $CCompiler = "gcc"
 $CppCompiler = "g++"
 
-# Language metadata: Id, Name, Extensions, Type, Tools.
+# Set by -q/--quiet. Informational output goes through Write-Info.
+$Quiet = $false
+
+# =============================================================================
+# 10-languages.ps1 - Language registry, lookup, and dependency checks
+#
+# $Languages is the single source of truth for supported languages. Every
+# other module asks this file to translate an extension, language name, or
+# tool name into a language record.
+# =============================================================================
+
 $Languages = @(
     [pscustomobject]@{ Id = "c"; Name = "C"; Extensions = @("c"); Type = "compiled"; Tools = @("gcc") },
     [pscustomobject]@{ Id = "cpp"; Name = "C++"; Extensions = @("cpp"); Type = "compiled"; Tools = @("g++") },
@@ -47,7 +82,174 @@ $Languages = @(
     [pscustomobject]@{ Id = "fsharp"; Name = "F#"; Extensions = @("fsx", "fs"); Type = "interpreted"; Tools = @("dotnet") }
 )
 
-$Quiet = $false
+# Turn a list of extensions into ".py, .pyw" style text.
+function Get-ExtensionDisplay {
+    param($Extensions)
+
+    return (($Extensions | ForEach-Object { ".$_" }) -join ", ")
+}
+
+# Return the subset of tools that are not on PATH.
+function Get-MissingTools {
+    param($Tools)
+
+    $missing = @()
+
+    foreach ($tool in $Tools) {
+        if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
+            $missing += $tool
+        }
+    }
+
+    return $missing
+}
+
+# Print the language table. With -Verbose, also report tool status.
+function Show-Languages {
+    param([bool]$Verbose)
+
+    Write-Host "Supported languages:"
+    Write-Host ""
+
+    if ($Verbose) {
+        Write-Host ("  {0,-12} {1,-36} {2,-12} {3}" -f "Language", "Extensions", "Type", "Status")
+    }
+    else {
+        Write-Host ("  {0,-12} {1,-36} {2}" -f "Language", "Extensions", "Type")
+    }
+
+    foreach ($language in $Languages) {
+        $extensions = Get-ExtensionDisplay $language.Extensions
+
+        if ($Verbose) {
+            $missing = @(Get-MissingTools $language.Tools)
+
+            if ($missing.Count -eq 0) {
+                $status = "installed"
+            }
+            else {
+                $status = "missing: $($missing -join ' ')"
+            }
+
+            Write-Host ("  {0,-12} {1,-36} {2,-12} {3}" -f $language.Name, $extensions, $language.Type, $status)
+        }
+        else {
+            Write-Host ("  {0,-12} {1,-36} {2}" -f $language.Name, $extensions, $language.Type)
+        }
+    }
+}
+
+# Resolve a language id, display name, extension, or tool name.
+# Returns $null when the target is unknown.
+function Find-Language {
+    param([string]$Target)
+
+    $normalized = $Target.ToLowerInvariant().TrimStart(".")
+
+    switch ($normalized) {
+        "golang" { $normalized = "go" }
+        "js" { $normalized = "javascript" }
+        "ts" { $normalized = "typescript" }
+        "cxx" { $normalized = "cpp" }
+        "py" { $normalized = "python" }
+    }
+
+    foreach ($language in $Languages) {
+        if ($language.Id.ToLowerInvariant() -eq $normalized -or
+            $language.Name.ToLowerInvariant() -eq $normalized) {
+            return $language
+        }
+
+        foreach ($extension in $language.Extensions) {
+            if ($extension.ToLowerInvariant() -eq $normalized) {
+                return $language
+            }
+        }
+
+        foreach ($tool in $language.Tools) {
+            if ($tool.ToLowerInvariant() -eq $normalized) {
+                return $language
+            }
+        }
+    }
+
+    return $null
+}
+
+# Resolve a file extension (without the leading dot) to a language record.
+function Resolve-Extension {
+    param([string]$Extension)
+
+    return Find-Language $Extension
+}
+
+# Check one language or every language. Returns the process exit code.
+function Invoke-Check {
+    param(
+        [string]$Target,
+        [bool]$Strict
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Target)) {
+        $language = Find-Language $Target
+
+        if ($null -eq $language) {
+            Write-Host "Unknown language: $Target"
+            Write-Host "Run 'coderun --list' to see supported languages."
+            return 1
+        }
+
+        $missing = @(Get-MissingTools $language.Tools)
+
+        if ($missing.Count -eq 0) {
+            Write-Host "$($language.Name): ok"
+            return 0
+        }
+
+        Write-Host "$($language.Name): missing: $($missing -join ' ')"
+        return 1
+    }
+
+    Write-Host "Checking required compilers and runtimes:"
+    Write-Host ""
+
+    $available = 0
+    $failures = 0
+
+    foreach ($language in $Languages) {
+        $missing = @(Get-MissingTools $language.Tools)
+
+        if ($missing.Count -eq 0) {
+            Write-Host ("  {0,-13} ok" -f $language.Name)
+            $available++
+        }
+        else {
+            Write-Host ("  {0,-13} missing: {1}" -f $language.Name, ($missing -join " "))
+            $failures++
+        }
+    }
+
+    Write-Host ""
+    Write-Host "$available of $($Languages.Count) language toolchains are available."
+
+    if ($Strict -and $failures -gt 0) {
+        Write-Host "Some dependencies are missing. Install the missing tools and try again."
+        return 1
+    }
+
+    if (-not $Strict) {
+        Write-Host "Run 'coderun --check <language>' to require a specific toolchain."
+    }
+
+    return 0
+}
+
+# =============================================================================
+# 20-output.ps1 - Informational output and --help
+#
+# Keep the help text in sync with the Unix runner and the README. The tests
+# assert that key options and languages are mentioned.
+# =============================================================================
 
 function Write-Info {
     param([string]$Message)
@@ -119,160 +321,12 @@ function Show-Help {
     Write-Host "Note: The required compiler or runtime must be installed and on PATH."
 }
 
-function Get-ExtensionDisplay {
-    param($Extensions)
-
-    return (($Extensions | ForEach-Object { ".$_" }) -join ", ")
-}
-
-function Get-MissingTools {
-    param($Tools)
-
-    $missing = @()
-
-    foreach ($tool in $Tools) {
-        if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
-            $missing += $tool
-        }
-    }
-
-    return $missing
-}
-
-function Show-Languages {
-    param([bool]$Verbose)
-
-    Write-Host "Supported languages:"
-    Write-Host ""
-
-    if ($Verbose) {
-        Write-Host ("  {0,-12} {1,-36} {2,-12} {3}" -f "Language", "Extensions", "Type", "Status")
-    }
-    else {
-        Write-Host ("  {0,-12} {1,-36} {2}" -f "Language", "Extensions", "Type")
-    }
-
-    foreach ($language in $Languages) {
-        $extensions = Get-ExtensionDisplay $language.Extensions
-
-        if ($Verbose) {
-            $missing = @(Get-MissingTools $language.Tools)
-
-            if ($missing.Count -eq 0) {
-                $status = "installed"
-            }
-            else {
-                $status = "missing: $($missing -join ' ')"
-            }
-
-            Write-Host ("  {0,-12} {1,-36} {2,-12} {3}" -f $language.Name, $extensions, $language.Type, $status)
-        }
-        else {
-            Write-Host ("  {0,-12} {1,-36} {2}" -f $language.Name, $extensions, $language.Type)
-        }
-    }
-}
-
-function Find-Language {
-    param([string]$Target)
-
-    $normalized = $Target.ToLowerInvariant().TrimStart(".")
-
-    switch ($normalized) {
-        "golang" { $normalized = "go" }
-        "js" { $normalized = "javascript" }
-        "ts" { $normalized = "typescript" }
-        "cxx" { $normalized = "cpp" }
-        "py" { $normalized = "python" }
-    }
-
-    foreach ($language in $Languages) {
-        if ($language.Id.ToLowerInvariant() -eq $normalized -or
-            $language.Name.ToLowerInvariant() -eq $normalized) {
-            return $language
-        }
-
-        foreach ($extension in $language.Extensions) {
-            if ($extension.ToLowerInvariant() -eq $normalized) {
-                return $language
-            }
-        }
-
-        foreach ($tool in $language.Tools) {
-            if ($tool.ToLowerInvariant() -eq $normalized) {
-                return $language
-            }
-        }
-    }
-
-    return $null
-}
-
-function Resolve-Extension {
-    param([string]$Extension)
-
-    return Find-Language $Extension
-}
-
-function Invoke-Check {
-    param(
-        [string]$Target,
-        [bool]$Strict
-    )
-
-    if (-not [string]::IsNullOrWhiteSpace($Target)) {
-        $language = Find-Language $Target
-
-        if ($null -eq $language) {
-            Write-Host "Unknown language: $Target"
-            Write-Host "Run 'coderun --list' to see supported languages."
-            return 1
-        }
-
-        $missing = @(Get-MissingTools $language.Tools)
-
-        if ($missing.Count -eq 0) {
-            Write-Host "$($language.Name): ok"
-            return 0
-        }
-
-        Write-Host "$($language.Name): missing: $($missing -join ' ')"
-        return 1
-    }
-
-    Write-Host "Checking required compilers and runtimes:"
-    Write-Host ""
-
-    $available = 0
-    $failures = 0
-
-    foreach ($language in $Languages) {
-        $missing = @(Get-MissingTools $language.Tools)
-
-        if ($missing.Count -eq 0) {
-            Write-Host ("  {0,-13} ok" -f $language.Name)
-            $available++
-        }
-        else {
-            Write-Host ("  {0,-13} missing: {1}" -f $language.Name, ($missing -join " "))
-            $failures++
-        }
-    }
-
-    Write-Host ""
-    Write-Host "$available of $($Languages.Count) language toolchains are available."
-
-    if ($Strict -and $failures -gt 0) {
-        Write-Host "Some dependencies are missing. Install the missing tools and try again."
-        return 1
-    }
-
-    if (-not $Strict) {
-        Write-Host "Run 'coderun --check <language>' to require a specific toolchain."
-    }
-
-    return 0
-}
+# =============================================================================
+# 30-completions.ps1 - Shell completion generators
+#
+# Each branch prints a self-contained completion script. Users can install the
+# output with their shell's normal completion mechanism.
+# =============================================================================
 
 function Show-Completions {
     param([string]$Shell)
@@ -374,6 +428,12 @@ Register-ArgumentCompleter -Native -CommandName coderun -ScriptBlock {
     }
 }
 
+# =============================================================================
+# 40-info.ps1 - --info support
+#
+# Prints the environment details users need when reporting a problem.
+# =============================================================================
+
 function Show-Info {
     $installPath = $PSCommandPath
 
@@ -400,6 +460,16 @@ function Show-Info {
     Write-Host "Languages: $($Languages.Count)"
     Write-Host "Runner URL: $CoderunRawBase/v$CoderunVersion/$RunnerPath"
 }
+
+# =============================================================================
+# 50-update.ps1 - Update, version check, and uninstall support
+#
+# All network access lives in this module. Updates are verified in three ways
+# before the installed runner is replaced:
+#   1. The downloaded file must look like a coderun PowerShell script.
+#   2. Its embedded version must match the announced release.
+#   3. Its SHA-256 hash must match the published SHA256SUMS entry.
+# =============================================================================
 
 function Test-VersionGreater([string]$Left, [string]$Right) {
     $leftParts = $Left.Split(".")
@@ -603,6 +673,14 @@ function Uninstall-Coderun {
     }
 }
 
+# =============================================================================
+# 60-execution.ps1 - Tool checks, compilation, and cleanup
+#
+# This module owns everything that produces or removes files on disk. It
+# relies on the variables resolved by the CLI module:
+#   $Language, $File, $Directory, $Base, $Extension, $OutputOpt, $HasOutput
+# =============================================================================
+
 function Assert-Tool {
     param([string]$Tool)
 
@@ -612,6 +690,8 @@ function Assert-Tool {
     }
 }
 
+# Resolve a custom -o path, adding the language-appropriate suffix when the
+# user did not provide an extension.
 function Resolve-CustomArtifact([string]$Value, [string]$Extension) {
     $fullPath = [System.IO.Path]::GetFullPath($Value)
 
@@ -626,6 +706,7 @@ function Resolve-CustomArtifact([string]$Value, [string]$Extension) {
     return "$fullPath.exe"
 }
 
+# Decide where the current language's artifact should be written.
 function Set-CompileArtifact {
     switch ($Language.Id) {
         "kotlin" {
@@ -652,6 +733,7 @@ function Set-CompileArtifact {
     }
 }
 
+# Compile the current source file. Exits with the compiler's status on failure.
 function Invoke-Compile {
     Set-CompileArtifact
 
@@ -722,6 +804,7 @@ function Invoke-Compile {
     }
 }
 
+# Remove one artifact and record the outcome.
 function Remove-Artifact([string]$Path) {
     if (Test-Path -LiteralPath $Path -PathType Leaf) {
         Remove-Item -LiteralPath $Path -Force
@@ -730,6 +813,8 @@ function Remove-Artifact([string]$Path) {
     }
 }
 
+# Remove every artifact that the current language can generate for the source
+# file, including custom output paths and Java inner classes.
 function Invoke-Clean {
     if ($Language.Type -eq "interpreted") {
         Write-Info "No build artifacts to clean for $Extension files (interpreted language)."
@@ -808,9 +893,17 @@ function Invoke-Clean {
     }
 }
 
-# ---------------------------------------------------------------------------
-# Argument parsing
-# ---------------------------------------------------------------------------
+# =============================================================================
+# 70-cli.ps1 - Command-line parsing, validation, and dispatch
+#
+# This module is the control centre. It fills the shared state that the
+# language, update, and execution modules consume:
+#   $Mode, $Action, $OutputOpt, $RuntimeOpt, $CheckTarget, $CheckStrict,
+#   $ListVerbose, $TimeIt, $CompletionShell, $File, $ProgramArgs
+#
+# Validation adds:
+#   $Directory, $Name, $Base, $Extension, $Language, $HasOutput
+# =============================================================================
 
 $RawArgs = @($args)
 $Mode = "run"
@@ -1007,6 +1100,10 @@ while ($index -lt $RawArgs.Count) {
     $index++
 }
 
+# ---------------------------------------------------------------------------
+# Top-level actions
+# ---------------------------------------------------------------------------
+
 if (-not [string]::IsNullOrWhiteSpace($Action)) {
     if ($Mode -ne "run") {
         Write-Host "Error: --$Action cannot be combined with --compile or --clean."
@@ -1073,6 +1170,10 @@ if (-not [string]::IsNullOrWhiteSpace($Action)) {
         }
     }
 }
+
+# ---------------------------------------------------------------------------
+# Flag and source-file validation
+# ---------------------------------------------------------------------------
 
 if ($ListVerbose) {
     Write-Host "Error: --verbose can only be used with --list."
@@ -1154,6 +1255,10 @@ if ($HasOutput) {
 $script:Artifact = ""
 $script:Cleaned = $false
 
+# ---------------------------------------------------------------------------
+# Clean and compile modes
+# ---------------------------------------------------------------------------
+
 if ($Mode -eq "clean") {
     if ($ProgramArgs.Count -gt 0) {
         Write-Host "Error: --clean does not accept program arguments."
@@ -1193,6 +1298,10 @@ if ($Mode -eq "compile") {
 
     exit 0
 }
+
+# ---------------------------------------------------------------------------
+# Run mode
+# ---------------------------------------------------------------------------
 
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 $exitCode = 0

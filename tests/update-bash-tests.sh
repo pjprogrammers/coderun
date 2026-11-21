@@ -36,56 +36,10 @@ fi
 rm -rf "$TMP"
 mkdir -p "$HOME_DIR/.local/bin" "$SERVE/main" "$SERVE/v9.9.9/bin" "$TMP/tmp"
 
-ok() {
-    echo "PASS: $1"
-    PASS=$((PASS + 1))
-}
-
-bad() {
-    echo "FAIL: $1"
-    if [ $# -gt 1 ]; then
-        printf '%s\n' "$2"
-    fi
-    FAIL=$((FAIL + 1))
-}
-
-assert_eq() {
-    local name="$1"
-    local expected="$2"
-    local actual="$3"
-
-    if [ "$expected" = "$actual" ]; then
-        ok "$name"
-    else
-        bad "$name" "expected: <$expected>
-actual:   <$actual>"
-    fi
-}
-
-assert_contains() {
-    local name="$1"
-    local needle="$2"
-    local haystack="$3"
-
-    if printf '%s' "$haystack" | grep -qF -- "$needle"; then
-        ok "$name"
-    else
-        bad "$name" "missing: <$needle>
-output:
-$haystack"
-    fi
-}
-
-hash_file() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" | awk '{print $1}'
-    else
-        echo "Error: sha256sum or shasum is required." >&2
-        exit 1
-    fi
-}
+# shellcheck source=tests/lib/assertions.sh
+source "$ROOT/tests/lib/assertions.sh"
+# shellcheck source=tests/lib/hash.sh
+source "$ROOT/tests/lib/hash.sh"
 
 make_candidate() {
     local version="$1"

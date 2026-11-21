@@ -34,6 +34,7 @@ No build files, no configuration, no daemon.
 - [Update and uninstall](#update-and-uninstall)
 - [Exit codes](#exit-codes)
 - [Project structure](#project-structure)
+- [Development](#development)
 - [Troubleshooting](#troubleshooting)
 - [Versioning and releases](#versioning-and-releases)
 - [Contributing](#contributing)
@@ -100,7 +101,7 @@ Different languages usually mean different commands:
 | macOS | `bin/coderun-mac` | `install-mac.sh` | `~/.local/bin/coderun` | `clang` / `clang++` |
 | Windows | `windows/coderun.ps1` | `install.ps1` | `%USERPROFILE%\bin\coderun.ps1` and `coderun.cmd` | `gcc` / `g++` |
 
-`bin/coderun` is the source of truth for Linux and macOS. It detects the platform at startup, and `scripts/sync.sh` generates identical `bin/coderun-mac` and legacy root `coderun` copies for compatibility. The Windows runner is maintained separately in `windows/coderun.ps1`.
+The Bash runner is built from the modules in `src/unix/`; `scripts/build.sh` produces `bin/coderun` and the macOS copy `bin/coderun-mac`. The Windows runner is built from `src/windows/` into `windows/coderun.ps1`.
 
 All three runners expose the same 26 languages and the same command-line options. The intentional platform differences are the C/C++ compiler choice, Python's executable name, and the shell integration.
 
@@ -497,6 +498,8 @@ Coderun's own options are only recognized before the source file. After the file
 
 The other runtimes use the same tool names on every platform, except Python: `python3` on Linux/macOS and `python` on Windows.
 
+The module layout, shared state, and update security model are documented in [docs/architecture.md](docs/architecture.md).
+
 ---
 
 ## Requirements and toolchains
@@ -686,23 +689,55 @@ Specific cases:
 
 ```text
 coderun/
+├── src/
+│   ├── unix/
+│   │   ├── 10-config.sh      # Version, paths, platform detection
+│   │   ├── 20-output.sh      # Logging and timing helpers
+│   │   ├── 30-languages.sh   # Language registry and dependency checks
+│   │   ├── 40-help.sh        # --help text
+│   │   ├── 50-completions.sh # Shell completions
+│   │   ├── 60-info.sh        # --info
+│   │   ├── 70-update.sh      # Update, version check, uninstall
+│   │   ├── 80-compile.sh     # Compile and clean
+│   │   ├── 90-run.sh         # Run dispatch
+│   │   ├── 95-cli.sh         # Parsing, validation, and main flow
+│   │   └── 99-main.sh        # Entry point
+│   └── windows/
+│       ├── 00-header.ps1     # Parameters, version, configuration
+│       ├── 10-languages.ps1  # Language registry and checks
+│       ├── 20-output.ps1     # Informational output and help
+│       ├── 30-completions.ps1
+│       ├── 40-info.ps1
+│       ├── 50-update.ps1
+│       ├── 60-execution.ps1  # Compile and clean
+│       └── 70-cli.ps1        # Parsing, validation, and run dispatch
 ├── bin/
-│   ├── coderun          # Linux/macOS runner (source of truth)
+│   ├── coderun          # Generated Linux/macOS runner
 │   └── coderun-mac      # Generated macOS copy
 ├── windows/
-│   └── coderun.ps1      # Windows runner
+│   └── coderun.ps1      # Generated Windows runner
 ├── scripts/
-│   ├── sync.sh          # Regenerate coderun-mac and root coderun
+│   ├── build.sh         # Build the runners from src/
 │   ├── checksums.sh     # Generate SHA256SUMS
-│   ├── check.sh         # Version, syntax, mode, and hash checks
+│   ├── check.sh         # Consistency, syntax, and hash checks
 │   └── release.sh       # Version bump, tag, and GitHub release
 ├── tests/
+│   ├── lib/
+│   │   ├── assertions.sh
+│   │   └── hash.sh
 │   ├── run-bash-tests.sh
 │   ├── update-bash-tests.sh
 │   ├── installer-tests.sh
 │   ├── run-powershell-tests.ps1
 │   ├── installer-tests.ps1
 │   └── fake-tool.sh
+├── docs/
+│   ├── README.md
+│   ├── architecture.md
+│   ├── development.md
+│   ├── testing.md
+│   ├── release.md
+│   └── code-style.md
 ├── .github/
 │   ├── workflows/ci.yml
 │   └── PSScriptAnalyzerSettings.psd1
@@ -710,39 +745,77 @@ coderun/
 ├── install-mac.sh       # macOS installer
 ├── install.ps1          # Windows installer
 ├── install.cmd          # Command Prompt wrapper for install.ps1
-├── coderun              # Legacy root copy of the Linux runner
 ├── VERSION              # Release version (2.4.0)
 ├── SHA256SUMS           # Checksums for release files
+├── Makefile             # Common developer tasks
+├── CONTRIBUTING.md      # Contributor guide
+├── .editorconfig        # Editor defaults
+├── .gitignore           # Ignored local files
 ├── README.md
 └── LICENSE
 ```
 
 | Path | Purpose |
 | --- | --- |
-| `bin/coderun` | Unified Bash runner for Linux and macOS |
-| `bin/coderun-mac` | Generated copy for macOS, kept for compatibility |
-| `windows/coderun.ps1` | PowerShell runner for Windows |
-| `scripts/sync.sh` | Regenerates `bin/coderun-mac` and legacy root `coderun` from `bin/coderun` |
+| `src/unix/` | Modular source for the Bash runner (Linux and macOS) |
+| `src/windows/` | Modular source for the PowerShell runner (Windows) |
+| `bin/coderun` | Generated unified Bash runner for Linux and macOS |
+| `bin/coderun-mac` | Generated macOS copy, kept for compatibility |
+| `windows/coderun.ps1` | Generated PowerShell runner for Windows |
+| `scripts/build.sh` | Concatenates `src/` modules into the single-file runners |
 | `scripts/checksums.sh` | Regenerates `SHA256SUMS` |
-| `scripts/check.sh` | Verifies version consistency, file modes, syntax, and checksums |
-| `scripts/release.sh` | Bumps versions, syncs runners, tags, pushes, and creates a GitHub release |
+| `scripts/check.sh` | Verifies version consistency, generated files, file modes, syntax, and checksums |
+| `scripts/release.sh` | Bumps versions, rebuilds runners, tags, pushes, and creates a GitHub release |
 | `tests/run-bash-tests.sh` | Unix behavior tests (languages, arguments, flags, output) |
 | `tests/update-bash-tests.sh` | Unix update and checksum tests against a local HTTP server |
 | `tests/installer-tests.sh` | Unix installer tests with temporary `HOME` values |
 | `tests/run-powershell-tests.ps1` | Windows behavior and update tests |
 | `tests/installer-tests.ps1` | Windows installer tests with temporary `USERPROFILE` values |
 | `tests/fake-tool.sh` | Fake toolchain shim used by Unix tests |
+| `tests/lib/` | Shared assertions and hashing helpers |
+| `docs/` | Maintainer documentation: architecture, development, testing, release, and style |
 | `.github/workflows/ci.yml` | Linux, macOS, and Windows CI matrix |
 | `.github/PSScriptAnalyzerSettings.psd1` | PSScriptAnalyzer rules for the Windows runner |
 | `install.sh` | Installs the runner to `~/.local/bin` on Linux |
 | `install-mac.sh` | Installs the runner to `~/.local/bin` on macOS |
 | `install.ps1` | Installs the runner to `%USERPROFILE%\bin` on Windows |
 | `install.cmd` | Command Prompt wrapper for `install.ps1` |
-| `coderun` | Legacy copy of the Linux runner, kept for compatibility |
 | `VERSION` | Single tracked release version, mirrored in the runners |
 | `SHA256SUMS` | Release checksums verified by `--update` |
-| `README.md` | Project documentation |
+| `Makefile` | Shortcuts for build, check, test, and lint |
+| `CONTRIBUTING.md` | Contributor workflow and pull request checklist |
+| `README.md` | User documentation |
 | `LICENSE` | MIT license |
+
+---
+
+## Development
+
+The committed runners are generated from `src/`. Users never need to build anything, but maintainers edit the modules and regenerate the artifacts:
+
+```bash
+./scripts/build.sh      # regenerate bin/coderun, bin/coderun-mac, and windows/coderun.ps1
+./scripts/check.sh      # verify versions, generated files, syntax, and checksums
+```
+
+Common tasks are also available through `make`:
+
+```bash
+make build
+make check
+make test
+```
+
+See [`docs/`](docs/README.md) for the architecture, development workflow, testing strategy, release process, and code style. Contributions are welcome; start with [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Source layout
+
+- `src/unix/` contains the Bash runner modules.
+- `src/windows/` contains the PowerShell runner modules.
+- Generated files are marked with a `GENERATED FILE - DO NOT EDIT` banner.
+- `scripts/build.sh --check` fails when a generated file is stale.
+
+The design and module responsibilities are documented in [docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -795,7 +868,7 @@ V2.4.0 is the largest release since the project moved to a multi-language runner
 - **Shell completions:** `--completions bash|zsh|fish|powershell`.
 - **Output controls:** `--time` reports elapsed time on stderr; `-q` / `--quiet` suppresses coderun's own messages.
 - **Hardened updates:** downloads come from the versioned tag, the runner's embedded version must match the announced release, `SHA256SUMS` is verified, and replacement stays atomic.
-- **One Unix runner:** Linux and macOS now share `bin/coderun`; `bin/coderun-mac` and the legacy root `coderun` are generated copies kept for compatibility.
+- **One Unix runner:** Linux and macOS now share `bin/coderun`; `bin/coderun-mac` is a generated copy kept for compatibility with the macOS installer and updater.
 - **Table-driven language metadata:** adding a language no longer requires editing a dozen dispatch blocks in each runner.
 - **Real tests and CI:** Unix and Windows suites cover every language with fake toolchains, update security cases, and installer behavior. CI runs on Ubuntu, macOS, and Windows, including PowerShell 7 and Windows PowerShell 5.1.
 
@@ -817,8 +890,10 @@ V2.3.1 made `--update` version-aware and added `install.cmd`. V2.3.0 added Lua, 
 
 1. Update `README.md` and run `scripts/check.sh`.
 2. Run the Unix and PowerShell test suites.
-3. Use `scripts/release.sh <version> --notes <file>` to bump the versions, sync the Unix copies, regenerate `SHA256SUMS`, commit, tag, push, and create the GitHub release.
+3. Use `scripts/release.sh <version> --notes <file>` to bump the versions, rebuild the runners, regenerate `SHA256SUMS`, commit, tag, push, and create the GitHub release.
 4. CI verifies the release on Ubuntu, macOS, and Windows.
+
+See [docs/release.md](docs/release.md) for the complete release checklist.
 
 ---
 
@@ -826,8 +901,8 @@ V2.3.1 made `--update` version-aware and added `install.cmd`. V2.3.0 added Lua, 
 
 1. Fork the repository.
 2. Create a branch for your change.
-3. For Linux/macOS behavior, edit `bin/coderun` only, then run `./scripts/sync.sh` to regenerate `bin/coderun-mac` and the legacy root `coderun`.
-4. For Windows behavior, edit `windows/coderun.ps1`.
+3. For Linux/macOS behavior, edit the modules in `src/unix/`. For Windows behavior, edit `src/windows/`.
+4. Regenerate the single-file runners with `./scripts/build.sh`.
 5. Keep the runner versions and `VERSION` in sync, then run `./scripts/check.sh`.
 6. Run the relevant tests:
 
@@ -844,14 +919,14 @@ V2.3.1 made `--update` version-aware and added `install.cmd`. V2.3.0 added Lua, 
 7. Run ShellCheck on the Unix scripts and PSScriptAnalyzer on the Windows runner if they are available:
 
    ```bash
-   shellcheck -S warning bin/coderun install.sh install-mac.sh scripts/*.sh tests/*.sh
+   shellcheck -S warning bin/coderun install.sh install-mac.sh scripts/*.sh src/unix/*.sh tests/*.sh tests/lib/*.sh
    ```
 
 8. Add or update tests for behavior changes, including argument forwarding, exit codes, and paths with spaces.
 9. Regenerate `SHA256SUMS` with `./scripts/checksums.sh` before committing release files.
 10. Open a pull request describing the change and the platform you tested.
 
-There is no build step: the shell and PowerShell scripts are the product. GitHub Actions runs the same checks on Ubuntu, macOS, and Windows.
+The committed runners are the product; users never need to build anything. Maintainers edit `src/` and run `./scripts/build.sh` to regenerate them. GitHub Actions runs the same checks on Ubuntu, macOS, and Windows. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`docs/`](docs/README.md) for the full workflow.
 
 ---
 
