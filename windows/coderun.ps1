@@ -28,7 +28,7 @@ param()
 $ErrorActionPreference = "Stop"
 
 # Keep in sync with the VERSION file. scripts/release.sh updates this line.
-$CoderunVersion = "2.4.0"
+$CoderunVersion = "2.4.1"
 
 # Override for testing or mirrors. The runner appends /main or /v<version>.
 if ($env:CODERUN_RAW_BASE) {

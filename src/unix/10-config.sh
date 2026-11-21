@@ -8,7 +8,7 @@
 # =============================================================================
 
 # Keep in sync with the VERSION file. scripts/release.sh updates this line.
-CODERUN_VERSION="2.4.0"
+CODERUN_VERSION="2.4.1"
 
 # Base URL used by --check-update and --update. Override it for testing or to
 # point at a mirror. The runner appends /main or /v<version> to this value.
