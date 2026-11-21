@@ -65,10 +65,12 @@ coderun/
 │   ├── coderun               # Generated Linux/macOS runner
 │   └── coderun-mac           # Generated macOS copy
 ├── windows/
-│   └── coderun.ps1           # Generated Windows runner
-├── scripts/                  # Build, check, checksum, and release tooling
+│   ├── coderun.ps1           # Generated Windows runner
+│   └── coderun.cmd           # Command Prompt launcher
+├── scripts/                  # Build, check, checksum, package, and release tooling
 ├── tests/                    # Behaviour, update, and installer tests
 ├── docs/                     # Maintainer documentation (this directory)
+├── .github/workflows/        # CI and release-asset publishing
 ├── install.sh                # Linux installer
 ├── install-mac.sh            # macOS installer
 ├── install.ps1               # Windows installer

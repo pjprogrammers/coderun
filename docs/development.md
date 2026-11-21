@@ -171,6 +171,7 @@ Invoke-ScriptAnalyzer -Path install.ps1 -Settings .github/PSScriptAnalyzerSettin
 | Run all consistency checks | `./scripts/check.sh` |
 | Run all Unix tests | `make test` |
 | Regenerate release checksums | `./scripts/checksums.sh` |
+| Build the release archives | `./scripts/package-release.sh [output-dir]` |
 | Bump and release a version | `./scripts/release.sh <version>` |
 | See available make targets | `make` or `make help` |
 

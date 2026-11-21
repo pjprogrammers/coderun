@@ -12,7 +12,7 @@ tested pull request.
 | `src/unix/` | Source for the Bash runner (Linux and macOS). |
 | `src/windows/` | Source for the PowerShell runner (Windows). |
 | `bin/`, `windows/coderun.ps1` | Generated release artifacts. Do not edit by hand. |
-| `scripts/` | Build, check, checksum, and release tooling. |
+| `scripts/` | Build, check, checksum, package, and release tooling. |
 | `tests/` | Behaviour, update, and installer tests. |
 | `docs/` | Maintainer documentation. |
 | `README.md` | User documentation. |

@@ -43,15 +43,16 @@ The release version lives in `VERSION` and is mirrored in:
 5. Run the release script with release notes:
 
    ```bash
-   ./scripts/release.sh 2.4.1 --notes release-notes.md
+   ./scripts/release.sh 2.4.2 --notes release-notes.md
    ```
 
-6. Confirm the GitHub release and CI run.
+6. Confirm the GitHub release, the `Release` workflow run, and all seven
+   release assets.
 
 For a dry run that creates a local commit without pushing:
 
 ```bash
-./scripts/release.sh 2.4.1 --no-push
+./scripts/release.sh 2.4.2 --no-push
 ```
 
 ---
@@ -69,24 +70,53 @@ For a dry run that creates a local commit without pushing:
 9. Tags the commit as `v<version>`.
 10. Pushes `main` and the tag.
 11. Creates a GitHub release with `gh` when available.
+12. The tag push triggers `.github/workflows/release.yml`, which packages the
+    six platform archives and uploads them with the release `SHA256SUMS`.
 
 ---
 
 ## Published artifacts
 
-Each release tag contains the files that installers and updaters use:
+A release publishes two related sets of files.
+
+### Tag contents
+
+The tag keeps the raw files that installers and the self-updater read:
 
 | File | Purpose |
 | --- | --- |
 | `bin/coderun` | Generated Linux runner. |
 | `bin/coderun-mac` | macOS runner copy. |
 | `windows/coderun.ps1` | Windows runner. |
+| `windows/coderun.cmd` | Command Prompt launcher bundled in Windows archives. |
 | `install.sh` | Linux installer. |
 | `install-mac.sh` | macOS installer. |
 | `install.ps1` | Windows installer. |
 | `install.cmd` | Command Prompt wrapper. |
-| `SHA256SUMS` | SHA-256 checksums for the release files. |
+| `SHA256SUMS` | SHA-256 checksums for the raw tag files used by `--update`. |
 | `VERSION` | Published version used by `--check-update` and `--update`. |
+
+### Release assets
+
+The GitHub release attaches the archives that installers download from
+`https://github.com/pjprogrammers/coderun/releases/latest/download/<asset>`:
+
+| Asset | Contents |
+| --- | --- |
+| `coderun-linux-x64.tar.gz` | `coderun`, `README.md`, `LICENSE`, `VERSION` |
+| `coderun-linux-arm64.tar.gz` | Same as `coderun-linux-x64.tar.gz` |
+| `coderun-macos-x64.tar.gz` | `coderun`, `README.md`, `LICENSE`, `VERSION` |
+| `coderun-macos-arm64.tar.gz` | Same as `coderun-macos-x64.tar.gz` |
+| `coderun-windows-x64.zip` | `coderun.ps1`, `coderun.cmd`, `README.md`, `LICENSE`, `VERSION` |
+| `coderun-windows-arm64.zip` | Same as `coderun-windows-x64.zip` |
+| `SHA256SUMS` | One `<sha256>  <filename>` line per archive |
+
+The runners are architecture-independent scripts, so the x64 and arm64
+archives contain the same runner. The six names exist so installers can select
+an asset by OS and CPU without special cases. `scripts/package-release.sh`
+builds the archives locally; the release workflow runs it on the tagged commit
+and uploads the results as release assets. These are not the automatic
+"Source code" ZIPs that GitHub adds.
 
 `--update` downloads from the versioned tag, not from `main`:
 
@@ -128,12 +158,17 @@ The script hashes:
 - `bin/coderun`
 - `bin/coderun-mac`
 - `windows/coderun.ps1`
+- `windows/coderun.cmd`
 - `install.sh`
 - `install-mac.sh`
 - `install.ps1`
 - `install.cmd`
 
 `scripts/check.sh` verifies `SHA256SUMS` against the working tree.
+
+The repository-root `SHA256SUMS` covers the raw tag files used by `--update`.
+The `SHA256SUMS` release asset is generated separately by
+`scripts/package-release.sh` and covers the six platform archives.
 
 ---
 

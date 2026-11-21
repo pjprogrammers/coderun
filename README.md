@@ -715,12 +715,14 @@ coderun/
 │   ├── coderun          # Generated Linux/macOS runner
 │   └── coderun-mac      # Generated macOS copy
 ├── windows/
-│   └── coderun.ps1      # Generated Windows runner
+│   ├── coderun.ps1      # Generated Windows runner
+│   └── coderun.cmd      # Command Prompt launcher for the runner
 ├── scripts/
-│   ├── build.sh         # Build the runners from src/
-│   ├── checksums.sh     # Generate SHA256SUMS
-│   ├── check.sh         # Consistency, syntax, and hash checks
-│   └── release.sh       # Version bump, tag, and GitHub release
+│   ├── build.sh           # Build the runners from src/
+│   ├── checksums.sh       # Generate SHA256SUMS
+│   ├── check.sh           # Consistency, syntax, and hash checks
+│   ├── package-release.sh # Build the six platform archives + SHA256SUMS
+│   └── release.sh         # Version bump, tag, and GitHub release
 ├── tests/
 │   ├── lib/
 │   │   ├── assertions.sh
@@ -740,7 +742,9 @@ coderun/
 │   ├── code-style.md
 │   └── workflow-map.png # Visual map of how the files connect
 ├── .github/
-│   ├── workflows/ci.yml
+│   ├── workflows/
+│   │   ├── ci.yml
+│   │   └── release.yml  # Package and upload release assets
 │   └── PSScriptAnalyzerSettings.psd1
 ├── install.sh           # Linux installer
 ├── install-mac.sh       # macOS installer
@@ -763,9 +767,11 @@ coderun/
 | `bin/coderun` | Generated unified Bash runner for Linux and macOS |
 | `bin/coderun-mac` | Generated macOS copy, kept for compatibility |
 | `windows/coderun.ps1` | Generated PowerShell runner for Windows |
+| `windows/coderun.cmd` | Command Prompt launcher bundled in the Windows release archives |
 | `scripts/build.sh` | Concatenates `src/` modules into the single-file runners |
 | `scripts/checksums.sh` | Regenerates `SHA256SUMS` |
 | `scripts/check.sh` | Verifies version consistency, generated files, file modes, syntax, and checksums |
+| `scripts/package-release.sh` | Builds the six platform archives and their release `SHA256SUMS` |
 | `scripts/release.sh` | Bumps versions, rebuilds runners, tags, pushes, and creates a GitHub release |
 | `tests/run-bash-tests.sh` | Unix behavior tests (languages, arguments, flags, output) |
 | `tests/update-bash-tests.sh` | Unix update and checksum tests against a local HTTP server |
@@ -776,6 +782,7 @@ coderun/
 | `tests/lib/` | Shared assertions and hashing helpers |
 | `docs/` | Maintainer documentation: architecture, development, testing, release, style, and the workflow map |
 | `.github/workflows/ci.yml` | Linux, macOS, and Windows CI matrix |
+| `.github/workflows/release.yml` | Packages and uploads the seven release assets when a `v*` tag is pushed |
 | `.github/PSScriptAnalyzerSettings.psd1` | PSScriptAnalyzer rules for the Windows runner |
 | `install.sh` | Installs the runner to `~/.local/bin` on Linux |
 | `install-mac.sh` | Installs the runner to `~/.local/bin` on macOS |
@@ -858,16 +865,15 @@ The release version is tracked in [`VERSION`](VERSION) and mirrored in the Linux
 
 ### Current release: V2.4.2
 
-V2.4.1 is a maintenance release that completes the source-layout refactor and hardens the release pipeline:
+V2.4.2 publishes installer-ready archives for every supported OS and CPU:
 
-- **Modular sources:** the Bash runner is split across `src/unix/` and the PowerShell runner across `src/windows/`.
-- **Single-file artifacts:** `scripts/build.sh` generates `bin/coderun`, `bin/coderun-mac`, and `windows/coderun.ps1` from the modules, so installation and self-updates still use one file.
-- **Cleaner repository:** removed the legacy root `coderun` copy and the obsolete `scripts/sync.sh` wrapper.
-- **Windows update reliability:** the updater now accepts generated runners whose banner comments precede `param()`.
-- **Release-proof tests:** the Unix suites read the current version from `VERSION` instead of hardcoding it.
-- **Developer tooling:** added `Makefile`, `.editorconfig`, `.gitignore`, `CONTRIBUTING.md`, and maintainer documentation under `docs/`.
+- **Platform archives:** each release attaches `coderun-linux-x64.tar.gz`, `coderun-linux-arm64.tar.gz`, `coderun-macos-x64.tar.gz`, `coderun-macos-arm64.tar.gz`, `coderun-windows-x64.zip`, and `coderun-windows-arm64.zip`. Every archive contains the runner plus `README.md`, `LICENSE`, and `VERSION` at the top level.
+- **Release checksums:** a `SHA256SUMS` asset lists one SHA-256 hash per archive, so installers can verify a download before unpacking it.
+- **Command Prompt launcher:** Windows archives include `coderun.cmd`, which runs the bundled PowerShell runner from Command Prompt.
+- **Automated publishing:** pushing a `v*` tag runs `.github/workflows/release.yml`, which rebuilds the runners, packages the six archives, and uploads all seven assets to the GitHub release.
+- **No runner changes:** all 26 languages and command-line options are unchanged from V2.4.1.
 
-All 26 languages and command-line options are unchanged from V2.4.0. V2.4.0 introduced argument forwarding, seven new languages, runtime selection, verified updates, and the unified Unix runner; see the release history below.
+V2.4.1 completed the source-layout refactor and hardened the release pipeline; see the release history below.
 
 ### Release history
 
@@ -881,13 +887,15 @@ All 26 languages and command-line options are unchanged from V2.4.0. V2.4.0 intr
 | V2.3.1 | [v2.3.1](https://github.com/pjprogrammers/coderun/releases/tag/v2.3.1) | Made `--update` version-aware and added a Command Prompt installer |
 | V2.4.0 | [v2.4.0](https://github.com/pjprogrammers/coderun/releases/tag/v2.4.0) | Argument forwarding, 7 new languages, runtime selection, verified updates, unified Unix runner, and CI |
 | V2.4.1 | [v2.4.1](https://github.com/pjprogrammers/coderun/releases/tag/v2.4.1) | Modular source layout, generated artifacts, repository cleanup, and Windows update reliability |
+| V2.4.2 | [v2.4.2](https://github.com/pjprogrammers/coderun/releases/tag/v2.4.2) | Installer-ready Linux, macOS, and Windows archives, release checksums, and automated asset publishing |
 
 ### Release process
 
 1. Update `README.md` and run `scripts/check.sh`.
 2. Run the Unix and PowerShell test suites.
 3. Use `scripts/release.sh <version> --notes <file>` to bump the versions, rebuild the runners, regenerate `SHA256SUMS`, commit, tag, push, and create the GitHub release.
-4. CI verifies the release on Ubuntu, macOS, and Windows.
+4. The tag push runs `.github/workflows/release.yml`, which packages and uploads the six archives plus the release `SHA256SUMS`.
+5. CI verifies the release on Ubuntu, macOS, and Windows.
 
 See [docs/release.md](docs/release.md) for the complete release checklist.
 
